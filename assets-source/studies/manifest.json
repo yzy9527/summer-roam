@@ -1,0 +1,18 @@
+[
+  {
+    "id": "reference-house",
+    "label": "乡间住宅 · 单层高山墙",
+    "dimensionsBlender": [
+      5.69,
+      6.691,
+      5.455
+    ],
+    "triangles": 46424,
+    "meshGroups": 10,
+    "source": "assets-source/studies/reference-house.blend",
+    "glb": "src/assets/studies/reference-house.glb",
+    "front": "Blender -Y / glTF +Z",
+    "textures": "Original deterministic baked color maps; glTF standard PBR.",
+    "meshObjects": 9
+  }
+]

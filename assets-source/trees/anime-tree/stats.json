@@ -1,0 +1,38 @@
+{
+  "source": "blender/anime_tree.blend",
+  "variant": "Anime",
+  "lodDistancesMetres": [
+    28,
+    85
+  ],
+  "levels": {
+    "near": {
+      "triangles": 139996,
+      "leaves": 19072,
+      "meshObjects": 2,
+      "opaqueLeaves": true,
+      "embeddedBark": true
+    },
+    "mid": {
+      "triangles": 36622,
+      "leaves": 4768,
+      "meshObjects": 2,
+      "opaqueLeaves": true,
+      "embeddedBark": true
+    },
+    "far": {
+      "triangles": 6863,
+      "leaves": 795,
+      "meshObjects": 2,
+      "opaqueLeaves": true,
+      "embeddedBark": true
+    }
+  },
+  "origin": [
+    0,
+    0,
+    0
+  ],
+  "preservedNearGeometry": true,
+  "sourceUnmodified": true
+}

@@ -1,0 +1,49 @@
+{
+  "id": "canal-goldfish",
+  "date": "2026-10-03",
+  "status": "passed",
+  "appearanceApproved": true,
+  "fishCount": 5,
+  "goldCount": 3,
+  "redWhiteCount": 2,
+  "bonesPerFish": 8,
+  "assetBytes": 144180,
+  "assetSha256": "3cc896dd247816527776ea00544400dfda38dcba196d3c38f57f563f958a007c",
+  "fishSafetyMetres": {
+    "simulatedSeconds": 120,
+    "surfaceGap": 0.0157210677405325,
+    "bedGap": 0.0680204097055166,
+    "fishGap": 0.05411099675627362
+  },
+  "browser": {
+    "viewport": {
+      "width": 1280,
+      "height": 720,
+      "pixelRatio": 1.5
+    },
+    "pauseFrozen": true,
+    "nightMix": 1,
+    "nightFishCount": 5,
+    "assetWarnings": [],
+    "consoleWarningsAndErrors": []
+  },
+  "evidenceDirectory": "output/canal-goldfish",
+  "limitations": [
+    "Finite sampling: deformed bounds once per second over 120 simulated seconds; 60Hz motion and turning over 60 seconds.",
+    "Independent small looping territories; no fluid dynamics or free schooling.",
+    "Desktop in-app browser only; no mobile or frame-rate guarantee."
+  ],
+  "verification": {
+    "command": "npm run verify",
+    "tests": 172,
+    "passed": 172,
+    "failed": 0,
+    "format": "passed",
+    "build": "passed",
+    "release": "passed",
+    "releaseFiles": 38,
+    "scope": "Cleanup applied to commit e152c32 in an isolated checkout, excluding other uncommitted work.",
+    "evidence": "output/canal-goldfish/commit-verify.log"
+  },
+  "runtimeEvidence": "output/canal-goldfish/runtime.json"
+}

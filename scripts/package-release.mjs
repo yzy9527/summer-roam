@@ -1,0 +1,10 @@
+import { mkdir, rm } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { resolve } from 'node:path';
+const root = resolve(import.meta.dirname, '..');
+const dest = resolve(root, 'output/release/summer-roam-oss.zip');
+await mkdir(resolve(root, 'output/release'), { recursive: true });
+await rm(dest, { force: true });
+await promisify(execFile)('zip', ['-r', '-q', dest, '.'], { cwd: resolve(root, 'dist') });
+console.log(`OSS upload archive: ${dest} (extract locally and upload its contents)`);

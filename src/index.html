@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>夏野兜兜 · 夏日乡间慢游</title>
+<meta name="description" content="夏野兜兜：开着小车自由探索夏日田野，慢慢欣赏乡间风景。">
+<link rel="icon" href="./favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<main id="game" data-control="car" aria-label="夏野兜兜 3D 自由探索游戏">
+ <div id="world" aria-label="可探索的三维夏日乡村田野场景"></div>
+ <header class="topbar">
+  <div class="brand"><img class="brand-symbol" src="./favicon.svg" width="47" height="47" alt="" aria-hidden="true"><div><strong>夏野兜兜</strong><span>SUMMER COUNTRYSIDE DRIVE</span></div></div>
+  <div class="top-actions"><div class="time-of-day" role="group" aria-label="场景时间"><button id="time-day" aria-pressed="true" disabled>☀ 白天</button><button id="time-night" aria-pressed="false" disabled>☾ 黑夜</button></div><span class="location"><i></i><span id="region-label">夏日田野 · 自由驾驶</span></span><button id="music-toggle" class="audio-toggle" aria-pressed="true" title="切换背景音乐">音乐：开</button><button id="effects-toggle" class="audio-toggle" aria-pressed="true" title="切换车辆音效">音效：开</button><button id="pause" class="icon-button" aria-label="暂停游戏" title="暂停 / 继续（Esc）" disabled>Ⅱ</button></div>
+ </header>
+ <section id="intro" class="panel intro" aria-labelledby="intro-title">
+  <div class="eyebrow"><span></span>从营地出发，慢慢看世界</div>
+  <h1 id="intro-title">慢慢看夏天。</h1>
+  <p>开着小车，开始今天的乡间慢游。<br>沿着田野和小路，慢慢欣赏夏日风景。</p>
+  <div class="intro-controls"><div class="wasd"><span></span><kbd>W</kbd><span></span><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></div><div><b>W / S 油门、倒车 · A / D 转向</b><span>Shift + 转向漂移 · 空格刹车</span></div></div>
+  <button id="start" class="primary" disabled>正在准备</button>
+  <div class="intro-note">L 车灯 · H 远近光 · R 回到停车处<br>左键 / E 展开动作圈 · 数字键选动作<br>右键拖动转镜头<br>滚轮缩放 · C 恢复车尾视角</div>
+ </section>
+ <section id="pause-panel" class="panel modal hidden" role="dialog" aria-modal="true" aria-labelledby="pause-title"><div class="eyebrow">TAKE IT SLOW</div><h2 id="pause-title">在树荫下，歇一会儿。</h2><p>小车正在等你，风景也是。</p><div class="audio-settings"><label for="music-volume">音乐音量</label><input id="music-volume" type="range" min="0" max="35" value="18" aria-label="音乐音量"><label for="effects-volume">场景音效</label><input id="effects-volume" type="range" min="0" max="35" value="22" aria-label="场景音效音量"><small id="audio-status" role="status"></small><small class="music-credit">白天：Easy Lemon · <a href="https://incompetech.com/music/royalty-free/index.html?Search=Search&amp;isrc=USUAN1200076" target="_blank" rel="noopener">Kevin MacLeod / incompetech.com</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a><br>黑夜：Dream Culture · <a href="https://www.incompetech.com/music/royalty-free/index.html?isrc=USUAN1300046" target="_blank" rel="noopener">Kevin MacLeod / incompetech.com</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a></small></div><button id="resume" class="primary">继续探索</button><button id="reset-pause" class="secondary">回到汽车起点</button></section>
+ <section id="error-panel" class="panel modal hidden" role="alert"><h2>田野暂时没有加载成功</h2><p id="error-message">请刷新页面，并确认浏览器已开启硬件加速。</p><button onclick="location.reload()" class="primary">重新加载</button></section>
+ <div id="toast" class="toast" role="status" aria-live="polite"></div>
+ <footer id="dashboard" class="dashboard hidden">
+  <div class="speed-card"><span class="speed-number" id="speed">0</span><div><span class="speed-unit">KM/H</span><span id="drive-status" class="drive-status">慢慢出发</span></div><span id="gear" class="gear">N</span></div>
+  <div class="key-guide car-keys"><span><kbd>W</kbd><kbd>S</kbd> 油门 / 倒车</span><span><kbd>A</kbd><kbd>D</kbd> 转向</span><span><kbd>Shift</kbd> + 转向 漂移</span><span><kbd>空格</kbd> 刹车</span><span><kbd>L</kbd> 车灯</span><span><kbd>H</kbd> 远近光</span><span><kbd>R</kbd> 回到停车处</span><span><kbd>Esc</kbd> 暂停</span></div>
+  <div id="vehicle-light-controls" class="vehicle-light-controls" data-beam="off" role="group" aria-label="车灯控制"><span id="light-status" role="status">车灯：关</span><button id="light-off" aria-pressed="true" title="关闭车灯（L）">关</button><button id="light-low" aria-pressed="false" title="近光灯（H 切换）">近光</button><button id="light-high" aria-pressed="false" title="远光灯（H 切换）">远光</button></div>
+  <div class="camera-guide"><span class="car-camera-help">左键 / E 选动作 · 右键拖动转镜头</span> · 滚轮缩放 · <kbd>C</kbd> 视角复位</div>
+  <div class="compass" aria-label="行驶方向"><span id="compass-arrow">↑</span><b>N</b></div>
+ </footer>
+ <div id="desktop-notice">此版本为电脑键鼠设计，请在电脑浏览器打开游玩</div>
+
+ <div class="vignette" aria-hidden="true"></div>
+</main>
+<script type="module" src="./main.js"></script>
+</body></html>

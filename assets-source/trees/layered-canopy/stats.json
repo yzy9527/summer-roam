@@ -1,0 +1,56 @@
+[
+  {
+    "variant": "Tall",
+    "lod": "near",
+    "sprays": 2760,
+    "triangles": 7014
+  },
+  {
+    "variant": "Tall",
+    "lod": "mid",
+    "sprays": 1200,
+    "triangles": 3702
+  },
+  {
+    "variant": "Tall",
+    "lod": "far",
+    "sprays": 576,
+    "triangles": 1830
+  },
+  {
+    "variant": "Broad",
+    "lod": "near",
+    "sprays": 2760,
+    "triangles": 7014
+  },
+  {
+    "variant": "Broad",
+    "lod": "mid",
+    "sprays": 1200,
+    "triangles": 3702
+  },
+  {
+    "variant": "Broad",
+    "lod": "far",
+    "sprays": 576,
+    "triangles": 1830
+  },
+  {
+    "variant": "Young",
+    "lod": "near",
+    "sprays": 2070,
+    "triangles": 5322
+  },
+  {
+    "variant": "Young",
+    "lod": "mid",
+    "sprays": 900,
+    "triangles": 2838
+  },
+  {
+    "variant": "Young",
+    "lod": "far",
+    "sprays": 432,
+    "triangles": 1434
+  }
+]

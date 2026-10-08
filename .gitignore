@@ -1,0 +1,19 @@
+node_modules/
+dist/
+/output/release/
+.idea/
+.DS_Store
+__pycache__/
+*.py[cod]
+/npm-debug.log*
+/yarn-debug.log*
+/yarn-error.log*
+
+# Local material retained for possible future reuse; never ship or commit.
+/local-archive/
+
+# Reproducible previews, logs and ad-hoc validation output; tracked evidence is retained.
+/output/
+/renders/
+/assets/
+/work/
