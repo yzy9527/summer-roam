@@ -2,9 +2,9 @@
 
 [简体中文](README.md) | [English](README.en.md)
 
-A desktop 3D driving and countryside exploration game built with Three.js. Drive an orange car along country roads, canals, forests and houses, watch animals roam, and take part in camp activities, calf escapes and rescues, and rice-field ploughing.
+[Live Demo](https://game.biubiubiu.win)
 
-The project identifier is `summer-roam`.
+A desktop 3D driving and countryside exploration game built with Three.js. Drive an orange car along country roads, canals, forests and houses, watch animals roam, and take part in camp activities, calf escapes and rescues, and rice-field ploughing.
 
 ## Screenshots
 
