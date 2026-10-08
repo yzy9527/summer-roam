@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { createModelLoader } from './loading/model-loader.js';
 import { assetUrl } from './asset-url.js';
 import { roadFrame, terrainHeight } from './world-base.js';
 import { landscapeHeight } from './world-queries.js';
@@ -128,7 +128,7 @@ export async function addCanalBed(scene, warnings, uniforms) {
   scene.add(sand);
   let prototypes;
   try {
-    const { scene: source } = await new GLTFLoader().loadAsync(assetUrl('water-pebbles'));
+    const { scene: source } = await createModelLoader().loadAsync(assetUrl('water-pebbles'));
     source.updateMatrixWorld(true);
     prototypes = Array.from({ length: 4 }, (_, i) => {
       const mesh = source.getObjectByName(`Water_pebble_${i}`);

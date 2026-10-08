@@ -2,7 +2,7 @@ import { createPaddyWorker } from './gameplay/paddy/worker.js';
 import { createPaddyNavigation } from './gameplay/paddy/navigation.js';
 import { snapshotData, recordPhase } from './app/snapshot-data.js';
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { createModelLoader } from './loading/model-loader.js';
 import { assetUrl } from './asset-url.js';
 import { createPaddyPloughing } from './paddy-ploughing.js';
 import { createWhipHolster } from './paddy-whip-holster.js';
@@ -564,7 +564,7 @@ export function createPaddyTask(
 export async function addPaddyTask(scene, colliders, zombies, warnings, animals, corral) {
   if (!corral || !zombies?.actor('pvz-flagbearer')) return null;
   try {
-    const asset = await new GLTFLoader().loadAsync(assetUrl('paddy-plough'));
+    const asset = await createModelLoader().loadAsync(assetUrl('paddy-plough'));
     return createPaddyTask(scene, colliders, zombies, animals, corral, asset.scene);
   } catch (error) {
     warnings.push('paddy-ploughing');

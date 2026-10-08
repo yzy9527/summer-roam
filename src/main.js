@@ -13,7 +13,8 @@ import { applySceneEnvironment } from './materials.js';
 import { buildField } from './field-scene.js';
 import { createDayNight } from './day-night.js';
 import { createVehicleLightControl, createVehicleLights } from './vehicle-lights.js';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { INITIAL_MODELS } from './loading/model-plan.js';
+import { createModelLoader, prefetchModels, yieldSceneWork } from './loading/model-loader.js';
 import { regionAt } from './world-queries.js';
 import { spawnState, stepDrive } from './drive.js';
 import { createExplorationAudio } from './exploration-audio.js';
@@ -37,14 +38,14 @@ const audio = createDriveAudio({
   effectsSlider: $('effects-volume'),
   status: $('audio-status'),
   ...createInteractionAudioHooks(
-    () => field?.animals.interactions,
+    () => field?.animals?.interactions,
     () => state,
   ),
 });
 const explorationAudio = createExplorationAudio({ getEffects: audio.preferences });
 const controlMode = 'car';
 const heldKeys = new Set();
-const activeDog = () => field?.noharaFamily.dog;
+const activeDog = () => field?.noharaFamily?.dog;
 const focusState = () => state;
 const sceneFocus = () => qa?.inspectionCamera.focus ?? focusState();
 const input = {
@@ -209,7 +210,7 @@ function animate(time) {
       delete state.drift;
     } else {
       hit = stepDrive(state, input, dt, colliders, (c) =>
-        field?.animals.collide(c, state, (hit) => audio.animalCollision(hit)),
+        field?.animals?.collide(c, state, (hit) => audio.animalCollision(hit)),
       );
     }
     audio.collisionTick(Math.max(0, rawFrameMs / 1000 || 0));
@@ -374,7 +375,9 @@ try {
   sun.shadow.normalBias = 0.045;
   sun.shadow.bias = -0.0003;
   scene.add(sun);
+  prefetchModels(INITIAL_MODELS);
   applySceneEnvironment(renderer, scene);
+  await yieldSceneWork();
   makeCar();
   resize();
   updateCar(0);
@@ -383,7 +386,22 @@ try {
   addEventListener('resize', resize);
   // Start rendering immediately; asset failures leave driving available with a message.
   renderer.setAnimationLoop(animate);
-  field = await buildField(scene, renderer, colliders);
+  const vehicleLoader = createModelLoader();
+  const loadVehicle = async (url) =>
+    validateVehicleAsset((await vehicleLoader.loadAsync(url)).scene);
+  // Begin the car alongside scenery, retaining the original base-asset fallback.
+  const vehicleReady = loadVehicle(VEHICLE_CONFIG.model)
+    .then((asset) => ({ asset, fallback: false }))
+    .catch(async (primaryError) => {
+      console.warn('09 final asset unavailable; loading 09 base asset', primaryError);
+      const asset = await loadVehicle(VEHICLE_CONFIG.fallbackModel);
+      return { asset, fallback: true };
+    })
+    .catch((error) => ({ error }));
+  field = await buildField(scene, renderer, colliders, {
+    progressive: true,
+    getPlayer: () => state,
+  });
   updateCamera(0, true);
   dayNight = createDayNight({
     scene,
@@ -407,25 +425,11 @@ try {
       toast(timeOfDay === 'night' ? '黑夜 · 抬头看看星星' : '白天 · 继续看夏日田野');
     });
   }
-  connectGameplayAudio({
-    field,
-    audio,
-    getState: () => state,
-    setImpact: (impact) => {
-      bullImpact = impact;
-    },
-  });
   try {
-    const loader = new GLTFLoader();
-    const loadVehicle = async (url) => validateVehicleAsset((await loader.loadAsync(url)).scene);
-    let asset;
-    try {
-      asset = await loadVehicle(VEHICLE_CONFIG.model);
-    } catch (primaryError) {
-      console.warn('09 final asset unavailable; loading 09 base asset', primaryError);
-      asset = await loadVehicle(VEHICLE_CONFIG.fallbackModel);
-      field.warnings.push('09 base fallback');
-    }
+    const result = await vehicleReady;
+    if (result.error) throw result.error;
+    const { asset } = result;
+    if (result.fallback) field.warnings.push('09 base fallback');
     scene.remove(car);
     ({ car, body, wheels } = assembleVehicle(asset));
     scene.add(car);
@@ -447,17 +451,39 @@ try {
   observer.start();
   ui.start.disabled = false;
   ui.start.textContent = '出发，一起看夏天';
-  if (field.warnings.length) toast('部分景物未加载，请刷新重试。');
   window.__seaside = {
     snapshot: observer.snapshot,
     explorationSnapshot: () => ({
       controlMode,
-      ...field.noharaFamily.snapshot(),
+      ...field.noharaFamily?.snapshot(),
       camera: { ...orbit },
       audio: explorationAudio.snapshot(),
     }),
   };
-  qa?.mount();
+  performance.mark('drive-ready');
+  toast(
+    field.warnings.length ? '部分景物未加载，请刷新重试。' : '可以出发了，田野里的动物正在赶来。',
+  );
+  void field
+    .loadBackground()
+    .then(() => {
+      connectGameplayAudio({
+        field,
+        audio,
+        getState: () => state,
+        setImpact: (impact) => {
+          bullImpact = impact;
+        },
+      });
+      performance.mark('world-ready');
+      qa?.mount();
+      if (field.warnings.length) toast('部分景物未加载，请刷新重试。');
+    })
+    .catch((error) => {
+      field.loading.actors = 'failed';
+      console.error('Background characters failed to initialize', error);
+      toast('部分角色未加载，请刷新重试。');
+    });
 } catch (error) {
   fail(error);
 }

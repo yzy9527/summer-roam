@@ -25,7 +25,7 @@ export function pickActionTarget(scene, ray, field, car) {
   const hit = ray.intersectObjects(scene.children, true).find((h) => visible(h.object));
   if (!hit) return { type: 'world', name: '田野动作' };
   const animals = Object.keys(ANIMAL_NAMES)
-    .map((id) => field?.animals.animal(id))
+    .map((id) => field?.animals?.animal(id))
     .filter(Boolean);
   const confined = field?.corral?.animals ?? [];
   for (let n = hit.object; n; n = n.parent) {
@@ -190,7 +190,7 @@ export function createSceneActions({
         'ring-bell',
         '摇铃铛',
         () => lookout.ring(),
-        lookout ? lookout.ringAvailability() : '瞭望员尚未就绪',
+        lookout && heist ? lookout.ringAvailability() : '瞭望员尚未就绪',
         '当前对象',
         '摇响塔台铃铛',
       );
@@ -208,7 +208,7 @@ export function createSceneActions({
     if (giant || cart) {
       const h = field.calfHeist,
         r = field.calfRescue,
-        calf = meadow.animal('hornless-calf');
+        calf = meadow?.animal('hornless-calf');
       const hs = h?.snapshot(),
         rs = r?.snapshot();
       const reason = h ? h.manualAvailability(calf) : '抓牛角色尚未就绪';

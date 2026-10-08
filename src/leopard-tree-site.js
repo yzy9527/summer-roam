@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { createModelLoader } from './loading/model-loader.js';
 import { assetUrl } from './asset-url.js';
 import { landscapeHeight, inStream } from './world-queries.js';
 import { nearestRoad, isRoadSurface } from './world-base.js';
@@ -104,8 +104,42 @@ export function createLeopardTreeSite(root, scene, colliders) {
       const triangle = new THREE.Triangle(...points);
       triangle.bounds = new THREE.Box3().setFromPoints(points);
       triangle.normal = triangle.getNormal(new THREE.Vector3());
+      triangle.order = triangles.length;
       triangles.push(triangle);
     }
+  }
+  const surfaceCells = new Map(),
+    cellSize = 0.4;
+  for (const triangle of triangles) {
+    const bounds = triangle.bounds;
+    for (let x = Math.floor(bounds.min.x / cellSize); x <= Math.floor(bounds.max.x / cellSize); x++)
+      for (
+        let y = Math.floor(bounds.min.y / cellSize);
+        y <= Math.floor(bounds.max.y / cellSize);
+        y++
+      )
+        for (
+          let z = Math.floor(bounds.min.z / cellSize);
+          z <= Math.floor(bounds.max.z / cellSize);
+          z++
+        ) {
+          const key = x + ',' + y + ',' + z;
+          if (!surfaceCells.has(key)) surfaceCells.set(key, new Set());
+          surfaceCells.get(key).add(triangle);
+        }
+  }
+  function candidatesNear(probe) {
+    const cell = probe.toArray().map((v) => Math.floor(v / cellSize));
+    const nearby = new Set();
+    for (let x = -1; x <= 1; x++)
+      for (let y = -1; y <= 1; y++)
+        for (let z = -1; z <= 1; z++)
+          for (const triangle of surfaceCells.get(
+            [cell[0] + x, cell[1] + y, cell[2] + z].join(','),
+          ) ?? [])
+            nearby.add(triangle);
+    // Preserve the original tie-breaking order for coincident triangles.
+    return [...nearby].sort((a, b) => a.order - b.order);
   }
   function barkContact(s, lateral = 0) {
     const f = frame(s);
@@ -122,19 +156,25 @@ export function createLeopardTreeSite(root, scene, colliders) {
       triangle,
       normal,
       distance = Infinity;
-    for (const candidateTriangle of triangles) {
-      if (candidateTriangle.normal.dot(f.normal) < 0.15) continue;
-      if (candidateTriangle.bounds.distanceToPoint(probe) ** 2 >= distance) continue;
-      const candidate = candidateTriangle.closestPointToPoint(probe, new THREE.Vector3());
-      if (candidate.clone().sub(p).dot(f.normal) < -0.01) continue;
-      const d = candidate.distanceToSquared(probe);
-      if (d < distance) {
-        distance = d;
-        point = candidate;
-        triangle = candidateTriangle;
-        normal = triangle.normal.clone();
+    const search = (candidates) => {
+      for (const candidateTriangle of candidates) {
+        if (candidateTriangle.normal.dot(f.normal) < 0.15) continue;
+        if (candidateTriangle.bounds.distanceToPoint(probe) ** 2 >= distance) continue;
+        const candidate = candidateTriangle.closestPointToPoint(probe, new THREE.Vector3());
+        if (candidate.clone().sub(p).dot(f.normal) < -0.01) continue;
+        const d = candidate.distanceToSquared(probe);
+        if (d < distance) {
+          distance = d;
+          point = candidate;
+          triangle = candidateTriangle;
+          normal = triangle.normal.clone();
+        }
       }
-    }
+    };
+    search(candidatesNear(probe));
+    // Anything outside the 27 cells is at least one full cell away. If the
+    // local answer is farther, retain the exhaustive search's exact result.
+    if (distance >= cellSize * cellSize) search(triangles);
     if (!triangle) throw new Error('No outward bark contact at ' + s);
     return { point, normal, triangle, forward: f.forward, side: f.side, s };
   }
@@ -181,26 +221,6 @@ export function createLeopardTreeSite(root, scene, colliders) {
   }
   // Include the sides of the native fork too: paws wrap around a narrow limb,
   // rather than reaching only the top triangles used by the body guide.
-  const surfaceCells = new Map(),
-    cellSize = 0.4;
-  for (const triangle of triangles) {
-    const bounds = triangle.bounds;
-    for (let x = Math.floor(bounds.min.x / cellSize); x <= Math.floor(bounds.max.x / cellSize); x++)
-      for (
-        let y = Math.floor(bounds.min.y / cellSize);
-        y <= Math.floor(bounds.max.y / cellSize);
-        y++
-      )
-        for (
-          let z = Math.floor(bounds.min.z / cellSize);
-          z <= Math.floor(bounds.max.z / cellSize);
-          z++
-        ) {
-          const key = x + ',' + y + ',' + z;
-          if (!surfaceCells.has(key)) surfaceCells.set(key, new Set());
-          surfaceCells.get(key).add(triangle);
-        }
-  }
   function contactNear(probe, hip, reach) {
     const nearby = new Set();
     for (const origin of hip ? [probe, hip] : [probe]) {
@@ -289,7 +309,7 @@ export function createLeopardTreeSite(root, scene, colliders) {
 
 export async function addLeopardTree(scene, colliders, warnings) {
   try {
-    const root = (await new GLTFLoader().loadAsync(assetUrl('jabami-anime-tree-v2'))).scene;
+    const root = (await createModelLoader().loadAsync(assetUrl('jabami-anime-tree-v2'))).scene;
     return createLeopardTreeSite(root, scene, colliders);
   } catch (error) {
     warnings.push('jabami-anime-tree-v2');

@@ -1,6 +1,6 @@
 import { assetUrl } from './asset-url.js';
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { createModelLoader } from './loading/model-loader.js';
 import { terrainHeight } from './world-base.js';
 
 export const NOHARA_HOUSE = { x: -48, z: 200, rotation: Math.PI / 2, scale: 1 };
@@ -18,7 +18,7 @@ export function prepareNoharaHouse(root) {
 }
 export async function addNoharaHouse(scene, colliders, warnings) {
   try {
-    const root = (await new GLTFLoader().loadAsync(assetUrl('nohara-house'))).scene;
+    const root = (await createModelLoader().loadAsync(assetUrl('nohara-house'))).scene;
     const group = prepareNoharaHouse(root),
       bounds = new THREE.Box3().setFromObject(group, true),
       size = bounds.getSize(new THREE.Vector3());

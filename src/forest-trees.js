@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { createModelLoader } from './loading/model-loader.js';
 import { assetUrl } from './asset-url.js';
 
 const LEVELS = ['near', 'mid', 'far'];
@@ -22,7 +22,7 @@ export function prepareForestLeaf(mesh) {
 }
 
 export async function loadForestTreeAssets() {
-  sourcePromise ??= new GLTFLoader()
+  sourcePromise ??= createModelLoader()
     .loadAsync(assetUrl(FOREST_ASSET_ID))
     .then(({ scene }) => {
       scene.updateMatrixWorld(true);

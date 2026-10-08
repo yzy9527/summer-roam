@@ -1,3 +1,4 @@
+import { publishActors } from './loading/actor-publication.js';
 import { createLeopardTree } from './leopard-tree.js';
 import { leopardTreeGroundAllowed } from './leopard-tree-site.js';
 import { createWolfMountain } from './wolf-mountain.js';
@@ -9,7 +10,7 @@ import { createBullCharge, bullPointAllowed } from './bull-charge.js';
 import { createAnimalInteractions } from './animal-interactions.js';
 import { createCowFamily } from './cow-family.js';
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { createModelLoader, yieldSceneWork } from './loading/model-loader.js';
 import { createCowBehavior, updateCowBehavior, patCow, cowRetreatTarget } from './cow-behavior.js';
 import { createAnimalAnimation } from './animal-animation.js';
 import { ANIMAL_PROFILES } from './animal-profiles.js';
@@ -68,8 +69,9 @@ export async function addFieldAnimals(
   warnings,
   mountainAvailable = false,
   treeSite = null,
+  { getPlayer } = {},
 ) {
-  const loader = new GLTFLoader(),
+  const loader = createModelLoader(),
     animals = [],
     staticObstacles = [...colliders];
   let obstacles = staticObstacles;
@@ -87,6 +89,7 @@ export async function addFieldAnimals(
   );
   for (const result of results) {
     if (!result) continue;
+    await yieldSceneWork();
     const { config, root } = result,
       bounds = new THREE.Box3().setFromObject(root, true);
     const center = bounds.getCenter(new THREE.Vector3()),
@@ -98,7 +101,6 @@ export async function addFieldAnimals(
     group.add(pose);
     group.name = config.id;
     group.scale.setScalar(config.scale);
-    scene.add(group);
     root.traverse((n) => {
       if (n.isMesh) {
         n.receiveShadow = true;
@@ -242,7 +244,6 @@ export async function addFieldAnimals(
       animal: animal.id,
     };
     animal.collider = collider;
-    colliders.push(collider);
     animals.push(animal);
     group.position.set(animal.x, landscapeHeight(animal.x, animal.z) + 0.025, animal.z);
     group.rotation.y = animal.heading;
@@ -258,6 +259,13 @@ export async function addFieldAnimals(
     });
     if (rigged) animal.rig = createAnimalAnimation(root, group, ANIMAL_PROFILES[config.id]);
   }
+  await publishActors({
+    scene,
+    colliders,
+    objects: animals.map((a) => a.group),
+    footprints: animals.map((a) => a.collider),
+    getPlayer,
+  });
   const family = createCowFamily(animals, (x, z, a, car, pair) =>
     animalPointAllowed(x, z, a, obstacles, animals, car, pair),
   );

@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { createModelLoader } from '../../../loading/model-loader.js';
 import { applyLeafMaterial, leafLOD } from '../../../tree-leaf.js';
 import { assetUrl } from '../../../asset-url.js';
 let sourcePromise;
 export async function loadSampleTree() {
-  sourcePromise ??= new GLTFLoader()
+  sourcePromise ??= createModelLoader()
     .loadAsync(assetUrl('sample-tree-02'))
     .then(({ scene: root }) => {
       root.name = 'Sample directional summer tree';

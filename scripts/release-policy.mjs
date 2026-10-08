@@ -37,5 +37,7 @@ export const RELEASE_BUDGET = Object.freeze({
   // Merged-field bounds and the skin-mounted whip holster add about 3 KiB.
   // Shared audio downloads and independent pending-play cancellation add 2.4 KiB
   // to the measured 1047.3 KiB baseline; allow 3 KiB for this runtime change.
-  codeBytes: 1051 * 1024,
+  // Lossless GLB decoding and staged startup add 28.7 KiB to 1049.7 KiB.
+  // Measured release: 1078.4 KiB; permit only this decoder/runtime expansion.
+  codeBytes: 1080 * 1024,
 });

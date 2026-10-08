@@ -4,11 +4,13 @@ import { cp, mkdir, writeFile } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { createHash } from 'node:crypto';
 import { releaseAssets } from './scripts/release-assets.mjs';
+import { compressGLB, MODEL_ENCODING_VERSION } from './scripts/compress-glb.mjs';
 
 const root = import.meta.dirname;
 const source = resolve(root, 'src'),
   defaultOut = resolve(root, 'dist');
 const digest = createHash('sha256');
+digest.update(MODEL_ENCODING_VERSION);
 for (const name of [...releaseAssets].sort())
   digest.update(name).update(readFileSync(resolve(source, name)));
 const assetVersion = digest.digest('hex').slice(0, 16);
@@ -53,12 +55,17 @@ export default defineConfig(({ command }) => {
               name.slice('assets/'.length),
             );
             await mkdir(dirname(dest), { recursive: true });
-            await cp(resolve(source, name), dest);
+            if (name.endsWith('.glb'))
+              await writeFile(dest, await compressGLB(readFileSync(resolve(source, name))));
+            else await cp(resolve(source, name), dest);
           }
           await writeFile(
             resolve(outputDirectory, 'THIRD-PARTY-LICENSES.txt'),
             await import('node:fs/promises').then((fs) =>
-              fs.readFile(resolve(root, 'node_modules/three/LICENSE'), 'utf8'),
+              Promise.all([
+                fs.readFile(resolve(root, 'node_modules/three/LICENSE'), 'utf8'),
+                fs.readFile(resolve(root, 'node_modules/meshoptimizer/LICENSE.md'), 'utf8'),
+              ]).then((licenses) => licenses.join('\n\n')),
             ),
           );
         },

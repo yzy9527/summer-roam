@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { createModelLoader } from './loading/model-loader.js';
 import { assetUrl } from './asset-url.js';
 import { createCartDriver } from './cart-passengers.js';
 import { CORRAL } from './corral-model.js';
@@ -459,7 +459,7 @@ export function createCrewCart(asset, zombies, colliders, ground = drivingHeight
 
 export async function addZombieCrewCart(scene, colliders, warnings, zombies) {
   try {
-    const asset = (await new GLTFLoader().loadAsync(assetUrl('zombie-crew-cart'))).scene;
+    const asset = (await createModelLoader().loadAsync(assetUrl('zombie-crew-cart'))).scene;
     const cart = createCrewCart(asset, zombies, colliders);
     scene.add(cart.root, cart.parkingBay);
     return cart;

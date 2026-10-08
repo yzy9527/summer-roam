@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { createModelLoader } from './loading/model-loader.js';
 import { assetUrl } from './asset-url.js';
 import {
   MOUNTAIN_SITE,
@@ -11,7 +11,7 @@ import {
 
 export async function addFieldMountain(scene, colliders, warnings) {
   try {
-    const root = (await new GLTFLoader().loadAsync(assetUrl('hokage-mountain'))).scene;
+    const root = (await createModelLoader().loadAsync(assetUrl('hokage-mountain'))).scene;
     root.name = 'Complete Hokage mountain';
     root.position.set(MOUNTAIN_SITE.x, MOUNTAIN_BASE, MOUNTAIN_SITE.z);
     root.rotation.y = MOUNTAIN_SITE.heading;

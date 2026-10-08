@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { createModelLoader } from './loading/model-loader.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { assetUrl } from './asset-url.js';
 import { drivingHeight, inStream, isRoadSurface, islandDistance } from './world-queries.js';
@@ -562,7 +562,7 @@ export async function addFieldZombies(scene, colliders, warnings) {
   await Promise.all(
     ZOMBIE_LAYOUT.map(async ({ id }) => {
       try {
-        sources.set(id, (await new GLTFLoader().loadAsync(assetUrl(id))).scene);
+        sources.set(id, (await createModelLoader().loadAsync(assetUrl(id))).scene);
       } catch (error) {
         warnings.push(id);
         console.warn(`Zombie model unavailable: ${id}`, error);

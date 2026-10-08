@@ -8,7 +8,7 @@ import { addNoharaHouse } from './nohara-house.js';
 import { addNoharaFamily } from './nohara-family.js';
 import { addUnifiedIrrigation } from './irrigation-style.js';
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { createModelLoader, yieldSceneWork } from './loading/model-loader.js';
 import { addFieldMountain } from './field-mountain.js';
 import { addFieldAnimals } from './field-animals.js';
 import { loadFieldTreeAssets } from './field-trees.js';
@@ -453,7 +453,12 @@ async function mountains(scene) {
     geometricMountains(scene);
   }
 }
-export async function buildField(scene, renderer, colliders) {
+export async function buildField(
+  scene,
+  renderer,
+  colliders,
+  { progressive = false, getPlayer } = {},
+) {
   const cull = [],
     warnings = [],
     night = { value: 0 };
@@ -617,8 +622,7 @@ export async function buildField(scene, renderer, colliders) {
       );
       scene.add(wire);
     }
-  await sky(scene, night);
-  await mountains(scene);
+  await Promise.all([sky(scene, night), mountains(scene)]);
   const nightSky = createNightSky(scene, night);
   scene.traverse((o) => {
     for (const material of Array.isArray(o.material) ? o.material : [o.material])
@@ -628,6 +632,7 @@ export async function buildField(scene, renderer, colliders) {
       }
   });
   const waterSky = captureWaterSky(renderer, scene);
+  await yieldSceneWork();
   nightSky.setMix(1);
   const nightWaterSky = captureWaterSky(renderer, scene, { background: scene.background });
   nightSky.setMix(0);
@@ -653,7 +658,7 @@ export async function buildField(scene, renderer, colliders) {
     });
     waterAudit.textContent = JSON.stringify(audit);
   }
-  const loader = new GLTFLoader();
+  const loader = createModelLoader();
   const [trees, house] = await Promise.all([
     loadFieldTreeAssets().catch((error) => {
       warnings.push('sample-tree-02');
@@ -743,7 +748,7 @@ export async function buildField(scene, renderer, colliders) {
       colliders.push({ x, z, radius: 4.8 * s, height: 5.455 * s });
     }
   await addNoharaHouse(scene, colliders, warnings);
-  const noharaFamily = await addNoharaFamily(scene, colliders, warnings);
+  let noharaFamily = null;
   const forestPoints = addSummerDressing(scene, cull, colliders);
   let forest = null;
   try {
@@ -800,90 +805,118 @@ export async function buildField(scene, renderer, colliders) {
   const summerGrass = addSummerGrass(scene, cull, colliders);
   const mountain = await addFieldMountain(scene, colliders, warnings);
   const leopardTree = await addLeopardTree(scene, colliders, warnings);
-  const animals = await addFieldAnimals(scene, colliders, warnings, !!mountain, leopardTree);
+  let animals = null;
   const zombies = await addFieldZombies(scene, colliders, warnings);
   zombies?.addGatekeeper();
   const lookout = zombies ? createZombieLookout(scene, colliders, zombies) : null;
   const woodenCart = zombies ? await addZombieCrewCart(scene, colliders, warnings, zombies) : null;
   const corral =
-    woodenCart &&
-    zombies?.actor('pvz-conehead') &&
-    zombies?.actor('pvz-gargantuar') &&
-    animals.animal('hornless-calf')
+    woodenCart && zombies?.actor('pvz-conehead') && zombies?.actor('pvz-gargantuar')
       ? createZombieCorral(scene, colliders, woodenCart, zombies, {
           externalDelivery: true,
           guard: 'pvz-gatekeeper',
           gateSide: 'right',
         })
       : null;
-  const paddyPloughing = await addPaddyTask(scene, colliders, zombies, warnings, animals, corral);
-  const calfHeist = corral
-    ? createZombieCalfHeist(scene, colliders, woodenCart, zombies, animals, corral, { lookout })
-    : null;
-  const calfRescue = corral
-    ? createZombieCalfRescue(scene, colliders, zombies, animals, corral, calfHeist)
-    : null;
-  const qaParams = new URLSearchParams(globalThis.location?.search ?? '');
-  if (
-    qaParams.has('qa') &&
-    ['front', 'side', 'rear'].includes(qaParams.get('crewcartview')) &&
-    woodenCart
-  ) {
-    woodenCart.mountDriver();
-    woodenCart.mountGiant();
-  }
-  if (qaParams.has('qa') && qaParams.has('carrypreview')) calfHeist?.previewCarry();
-  // Deterministic real-scene reproductions; these only run with explicit QA URLs.
-  if (qaParams.has('qa') && calfHeist && qaParams.has('clearancecheck')) {
-    const positionZombie = (id, at) => {
-      const actor = zombies.actor(id);
-      actor.object.position.set(at.x, drivingHeight(at.x, at.z), at.z);
-      actor.object.rotation.set(0, at.heading ?? 0, 0, 'YXZ');
-      Object.assign(actor.collider, { x: at.x, z: at.z });
-      zombies.rebind(id);
-      return actor;
-    };
-    if (qaParams.get('clearancecheck') === 'boarding') {
-      for (const [id, z] of [
-        ['pvz-conehead', 2.3],
-        ['pvz-gargantuar', -0.65],
-      ]) {
-        positionZombie(id, woodenCart.world(-5, 0, z));
-        zombies.take(id);
-      }
-      const blocker = positionZombie('pvz-browncoat', woodenCart.world(-3.15, 0, -0.65));
-      zombies.release(blocker.layout.id);
-      blocker.layout.speed = 0;
-      calfHeist.startManual();
-    } else if (qaParams.get('clearancecheck') === 'pickup') {
-      for (const [id, x, z] of [
-        ['hornless-calf', -25, 10],
-        ['golden-cow', -25, 11.08],
-        ['copper-cow', -35, 25],
-      ]) {
-        const animal = animals.animal(id);
-        Object.assign(animal, { x, z, heading: -Math.PI / 2, target: null, wait: 600 });
-        animal.group.position.set(x, drivingHeight(x, z) + 0.025, z);
-        animal.group.rotation.set(0, animal.heading, 0, 'YXZ');
-        Object.assign(animal.collider, { x, z });
-      }
-      positionZombie('pvz-gargantuar', { x: -25, z: 14.5, heading: Math.PI });
-      calfHeist.holdManual();
-    }
-  }
-  const campsite = await addCampsiteCookingSet(scene, colliders, warnings);
-  const tick = createGameplayTick({
-    animals,
-    goldfish,
+  const animalAccess = { animal: (id) => animals?.animal(id) };
+  const paddyPloughing = await addPaddyTask(
+    scene,
+    colliders,
     zombies,
-    paddy: paddyPloughing,
-    cart: woodenCart,
+    warnings,
+    animalAccess,
     corral,
-    heist: calfHeist,
-    rescue: calfRescue,
-    campsite,
-  });
-  return {
+  );
+  const campsite = await addCampsiteCookingSet(scene, colliders, warnings);
+  let calfHeist = null,
+    calfRescue = null;
+  const loading = { actors: 'pending' };
+  let background;
+  function loadBackground() {
+    return (background ??= finishBackground());
+  }
+  async function finishBackground() {
+    loading.actors = 'loading';
+    [animals, noharaFamily] = await Promise.all([
+      addFieldAnimals(scene, colliders, warnings, !!mountain, leopardTree, { getPlayer }),
+      addNoharaFamily(scene, colliders, warnings, { getPlayer }),
+    ]);
+    calfHeist =
+      corral && animals.animal('hornless-calf')
+        ? createZombieCalfHeist(scene, colliders, woodenCart, zombies, animals, corral, { lookout })
+        : null;
+    calfRescue = calfHeist
+      ? createZombieCalfRescue(scene, colliders, zombies, animals, corral, calfHeist)
+      : null;
+    const qaParams = new URLSearchParams(globalThis.location?.search ?? '');
+    if (
+      qaParams.has('qa') &&
+      ['front', 'side', 'rear'].includes(qaParams.get('crewcartview')) &&
+      woodenCart
+    ) {
+      woodenCart.mountDriver();
+      woodenCart.mountGiant();
+    }
+    if (qaParams.has('qa') && qaParams.has('carrypreview')) calfHeist?.previewCarry();
+    // Deterministic real-scene reproductions; these only run with explicit QA URLs.
+    if (qaParams.has('qa') && calfHeist && qaParams.has('clearancecheck')) {
+      const positionZombie = (id, at) => {
+        const actor = zombies.actor(id);
+        actor.object.position.set(at.x, drivingHeight(at.x, at.z), at.z);
+        actor.object.rotation.set(0, at.heading ?? 0, 0, 'YXZ');
+        Object.assign(actor.collider, { x: at.x, z: at.z });
+        zombies.rebind(id);
+        return actor;
+      };
+      if (qaParams.get('clearancecheck') === 'boarding') {
+        for (const [id, z] of [
+          ['pvz-conehead', 2.3],
+          ['pvz-gargantuar', -0.65],
+        ]) {
+          positionZombie(id, woodenCart.world(-5, 0, z));
+          zombies.take(id);
+        }
+        const blocker = positionZombie('pvz-browncoat', woodenCart.world(-3.15, 0, -0.65));
+        zombies.release(blocker.layout.id);
+        blocker.layout.speed = 0;
+        calfHeist.startManual();
+      } else if (qaParams.get('clearancecheck') === 'pickup') {
+        for (const [id, x, z] of [
+          ['hornless-calf', -25, 10],
+          ['golden-cow', -25, 11.08],
+          ['copper-cow', -35, 25],
+        ]) {
+          const animal = animals.animal(id);
+          Object.assign(animal, { x, z, heading: -Math.PI / 2, target: null, wait: 600 });
+          animal.group.position.set(x, drivingHeight(x, z) + 0.025, z);
+          animal.group.rotation.set(0, animal.heading, 0, 'YXZ');
+          Object.assign(animal.collider, { x, z });
+        }
+        positionZombie('pvz-gargantuar', { x: -25, z: 14.5, heading: Math.PI });
+        calfHeist.holdManual();
+      }
+    }
+    Object.assign(field, { animals, noharaFamily, calfHeist, calfRescue });
+    tick = makeTick();
+    loading.actors = 'ready';
+    return field;
+  }
+  const makeTick = () =>
+    createGameplayTick({
+      animals,
+      goldfish,
+      zombies,
+      paddy: paddyPloughing,
+      cart: woodenCart,
+      corral,
+      heist: calfHeist,
+      rescue: calfRescue,
+      campsite,
+    });
+  let tick = makeTick();
+  const field = {
+    loading,
+    loadBackground,
     warnings,
     sky: nightSky,
     animals,
@@ -908,7 +941,7 @@ export async function buildField(scene, renderer, colliders) {
     update(frame) {
       const { seconds, focus: carPosition, dt, cameraPosition, player: actualCar } = frame;
       forest?.update(cameraPosition);
-      noharaFamily.update(dt, carPosition, actualCar);
+      noharaFamily?.update(dt, carPosition, actualCar);
       summerGrass.update(seconds, carPosition);
       tick(frame);
       time.value = seconds;
@@ -919,4 +952,6 @@ export async function buildField(scene, renderer, colliders) {
     },
     roadLength: ROAD_LENGTH,
   };
+  if (!progressive) await loadBackground();
+  return field;
 }

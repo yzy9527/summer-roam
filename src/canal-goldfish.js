@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { createModelLoader } from './loading/model-loader.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { assetUrl } from './asset-url.js';
 import { roadFrame, terrainHeight } from './world-base.js';
@@ -135,7 +135,7 @@ export function createGoldfishController(source, night = { value: 0 }) {
 
 export async function addCanalGoldfish(scene, warnings, night) {
   try {
-    const gltf = await new GLTFLoader().loadAsync(assetUrl('canal-goldfish'));
+    const gltf = await createModelLoader().loadAsync(assetUrl('canal-goldfish'));
     const controller = createGoldfishController(gltf.scene, night);
     scene.add(controller.root);
     return controller;

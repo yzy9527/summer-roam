@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { createModelLoader } from './loading/model-loader.js';
 import { assetUrl } from './asset-url.js';
 import { drivingHeight } from './world-queries.js';
 
@@ -72,7 +72,7 @@ export function createCampsiteCookingSet(gltf, colliders, ground = drivingHeight
 
 export async function addCampsiteCookingSet(scene, colliders, warnings) {
   try {
-    const gltf = await new GLTFLoader().loadAsync(assetUrl('campsite-cooking-set'));
+    const gltf = await createModelLoader().loadAsync(assetUrl('campsite-cooking-set'));
     const controller = createCampsiteCookingSet(gltf, colliders);
     scene.add(controller.root);
     return controller;

@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { releaseAssets } from './release-assets.mjs';
 import { RELEASE_BUDGET } from './release-policy.mjs';
+import { MODEL_ENCODING_VERSION, verifyGLBEquivalence } from './compress-glb.mjs';
 const root = resolve(import.meta.dirname, '..'),
   out = resolve(process.argv[2] ?? resolve(root, 'dist'));
 async function files(dir) {
@@ -22,16 +23,16 @@ const paths = await files(out),
   names = paths.map((p) => relative(out, p).split(sep).join('/'));
 const html = await readFile(resolve(out, 'index.html'), 'utf8');
 const digest = createHash('sha256');
+digest.update(MODEL_ENCODING_VERSION);
 for (const name of [...releaseAssets].sort())
   digest.update(name).update(await readFile(resolve(root, 'src', name)));
 const version = digest.digest('hex').slice(0, 16);
 for (const name of releaseAssets) {
   const deployed = resolve(out, `assets/runtime-${version}`, name.slice(7));
-  assert.deepEqual(
-    await readFile(deployed),
-    await readFile(resolve(root, 'src', name)),
-    `Changed or missing resource: ${name}`,
-  );
+  const published = await readFile(deployed),
+    original = await readFile(resolve(root, 'src', name));
+  if (name.endsWith('.glb')) await verifyGLBEquivalence(original, published);
+  else assert.deepEqual(published, original, `Changed or missing resource: ${name}`);
 }
 const registered = releaseAssets.map((name) => `assets/runtime-${version}/` + name.slice(7));
 assert.deepEqual(
