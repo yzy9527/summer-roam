@@ -1,10 +1,24 @@
-# Summer Roam · 夏野兜兜
+# <img src="src/favicon.svg" alt="夏野兜兜图标" width="40" height="40"> Summer Roam · 夏野兜兜
 
 [简体中文](README.md) | [English](README.en.md)
 
 使用 Three.js 制作的桌面端 3D 自由驾驶与田野探索游戏。开着橙色小车游览乡间道路、水渠、树林和住宅，观察动物活动，体验营地抓牛、逃跑救援和水田耕作。
 
 项目标识为 `summer-roam`。
+
+## 游戏截图
+
+**田野动物**
+
+![田野中的牛、狼与僵尸](docs/images/countryside-animals.png)
+
+**营地围栏**
+
+![营地中的小牛、木围栏与篝火](docs/images/campsite-enclosure.png)
+
+**水田耕作**
+
+![水田中的小牛与扶犁工](docs/images/rice-field-ploughing.png)
 
 ## 本地运行
 

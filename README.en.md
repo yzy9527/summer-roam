@@ -1,10 +1,24 @@
-# Summer Roam
+# <img src="src/favicon.svg" alt="Summer Roam icon" width="40" height="40"> Summer Roam
 
 [简体中文](README.md) | [English](README.en.md)
 
 A desktop 3D driving and countryside exploration game built with Three.js. Drive an orange car along country roads, canals, forests and houses, watch animals roam, and take part in camp activities, calf escapes and rescues, and rice-field ploughing.
 
 The project identifier is `summer-roam`.
+
+## Screenshots
+
+**Countryside animals**
+
+![Cows, a wolf and a zombie in the countryside](docs/images/countryside-animals.png)
+
+**Campsite enclosure**
+
+![A calf, a wooden enclosure and a campfire at the campsite](docs/images/campsite-enclosure.png)
+
+**Rice-field ploughing**
+
+![A calf and ploughing workers in the rice field](docs/images/rice-field-ploughing.png)
 
 ## Run locally
 
