@@ -118,6 +118,7 @@ function audioFixture(t, f) {
   );
   const audio = createDriveAudio({
     ...ui,
+    createMedia: (url) => new Media(url),
     ...createInteractionAudioHooks(
       () => f.interactions,
       () => f.car,

@@ -1,3 +1,5 @@
+import { setAudioSource } from './shared-media.js';
+
 /**
  * A single spatial media slot. Reserve before play(); stale failures cannot
  * release a newer request. Business probabilities and cooldowns stay outside.
@@ -51,7 +53,7 @@ export function createSpatialVoice(
       active = { event, notify };
       started = false;
       requests++;
-      if (selectSource) media.src = selectSource(event);
+      if (selectSource) setAudioSource(media, selectSource(event));
       media.volume = gain(event);
       media.currentTime = 0;
       try {

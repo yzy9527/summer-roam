@@ -55,7 +55,7 @@ test('bull pats use moo while vehicle collision and retaliation keep their origi
       new Element(),
     ]),
   );
-  const audio = createDriveAudio(ui);
+  const audio = createDriveAudio({ ...ui, createMedia: (url) => new Media(url) });
   t.after(() => audio.setPlaying(false));
   const active = () => Media.all.filter((media) => !media.paused);
   audio.setPlaying(true);
@@ -126,6 +126,7 @@ test('complete maternal cry hands audio to g-know; retaliation honors shared coo
     );
     const audio = createDriveAudio({
       ...ui,
+      createMedia: (url) => new Media(url),
       bullCharge: {
         protect() {
           protection++;
@@ -207,6 +208,7 @@ test('calf finishes before bull follow dialogue, shared locks release on ended o
     );
     const audio = createDriveAudio({
       ...ui,
+      createMedia: (url) => new Media(url),
       encounters: {
         follow() {
           facing = true;
@@ -291,6 +293,7 @@ test('mother collision cancels an earlier calf collision cry and its pending bul
     );
     const audio = createDriveAudio({
       ...ui,
+      createMedia: (url) => new Media(url),
       encounters: {
         follow() {
           follows++;

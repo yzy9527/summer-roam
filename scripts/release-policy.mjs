@@ -35,5 +35,7 @@ export const RELEASE_BUDGET = Object.freeze({
   // route-aware traffic/patrol selection total about 1043 KiB after minification.
   // Allow this approved runtime expansion; retain the asset/file caps.
   // Merged-field bounds and the skin-mounted whip holster add about 3 KiB.
-  codeBytes: 1048 * 1024,
+  // Shared audio downloads and independent pending-play cancellation add 2.4 KiB
+  // to the measured 1047.3 KiB baseline; allow 3 KiB for this runtime change.
+  codeBytes: 1051 * 1024,
 });

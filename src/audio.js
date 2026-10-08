@@ -22,6 +22,7 @@ import { createLookoutBell } from './lookout-bell.js';
 import { createPaddyCowVoice } from './paddy-cow-voice.js';
 import { createPaddyPloughAudio } from './paddy-plough-audio.js';
 import { createLookoutVoice, LOOKOUT_VOICE_URL } from './lookout-voice.js';
+import { createSharedAudio } from './audio/shared-media.js';
 // Original, softly filtered vehicle synthesis. No third-party vehicle recordings.
 export { MUSIC_URL, NIGHT_MUSIC_URL };
 export function vehicleTargets(state, input) {
@@ -47,6 +48,7 @@ export function createDriveAudio({
   bullCharge = {},
   encounters = {},
   wolfMountain = {},
+  createMedia = createSharedAudio,
 }) {
   let dialogueFactor = 1;
   let prefs = { music: true, effects: true, musicVolume: 0.18, effectsVolume: 0.22 };
@@ -56,15 +58,15 @@ export function createDriveAudio({
     for (const k of ['musicVolume', 'effectsVolume'])
       if (Number.isFinite(saved[k])) prefs[k] = Math.max(0, Math.min(0.35, saved[k]));
   } catch {}
-  const calfMedia = new Audio(CALF_VOICE_URL),
+  const calfMedia = createMedia(CALF_VOICE_URL),
     calfVoice = createCalfVoice(calfMedia, () => publish(), calfFamily);
-  const bullMedia = new Audio(BULL_VOICE_URL),
-    bullWarningMedia = new Audio(BULL_WARNING_URL),
+  const bullMedia = createMedia(BULL_VOICE_URL),
+    bullWarningMedia = createMedia(BULL_WARNING_URL),
     bullVoice = createBullVoice(bullMedia, bullCharge, () => publish(), bullWarningMedia);
   const collisionMedia = Object.fromEntries(
       Object.entries({ ...COW_COLLISION_URLS, 'leopard-tap': LEOPARD_TAP_URL }).map(([id, url]) => [
         id,
-        new Audio(url),
+        createMedia(url),
       ]),
     ),
     collisionVoice = createCowCollisionVoice(collisionMedia, () => publish(), Math.random, {
@@ -79,7 +81,7 @@ export function createDriveAudio({
       },
     });
   const responseMedia = Object.fromEntries(
-      Object.entries(BULL_RESPONSE_URLS).map(([mode, url]) => [mode, new Audio(url)]),
+      Object.entries(BULL_RESPONSE_URLS).map(([mode, url]) => [mode, createMedia(url)]),
     ),
     responseVoice = createBullResponseVoice(
       responseMedia,
@@ -89,7 +91,7 @@ export function createDriveAudio({
         if (mode === 'follow') encounters.stopFollow?.();
       },
     );
-  const howlMedia = new Audio(WOLF_HOWL_URL);
+  const howlMedia = createMedia(WOLF_HOWL_URL);
   const howlVoice = createWolfHowlVoice(
     howlMedia,
     (type) => wolfMountain.event?.(type),
@@ -102,7 +104,7 @@ export function createDriveAudio({
       ...MANUAL_ANIMAL_CALL_URLS,
       ...CORRAL_CALF_CALL_URLS,
       ...RESCUE_VOICE_URLS,
-    }).map(([id, url]) => [id, new Audio(url)]),
+    }).map(([id, url]) => [id, createMedia(url)]),
   );
   const corralVoice = createCorralVoice(
     corralMedia,
@@ -116,7 +118,7 @@ export function createDriveAudio({
       !bullVoice.snapshot().warning.busy,
   );
   const liftVoice = createCalfLiftVoice(
-    new Audio(CALF_LIFT_URLS[0]),
+    createMedia(CALF_LIFT_URLS[0]),
     () =>
       !corralVoice.busy() &&
       !howlVoice.busy() &&
@@ -129,16 +131,19 @@ export function createDriveAudio({
   let effectsPosition = null,
     corralListenerPosition = null;
   const music = createBackgroundMusic(
-    { day: new Audio(MUSIC_URL), night: new Audio(NIGHT_MUSIC_URL) },
+    {
+      day: createMedia(MUSIC_URL, { preload: 'none' }),
+      night: createMedia(NIGHT_MUSIC_URL, { preload: 'none' }),
+    },
     () => {
       paint();
       publish();
     },
   );
-  const lookoutVoice = createLookoutVoice(new Audio(LOOKOUT_VOICE_URL));
-  const gateSignalVoice = createLookoutVoice(new Audio(LOOKOUT_VOICE_URL));
+  const lookoutVoice = createLookoutVoice(createMedia(LOOKOUT_VOICE_URL));
+  const gateSignalVoice = createLookoutVoice(createMedia(LOOKOUT_VOICE_URL));
   const paddyCowVoice = createPaddyCowVoice(
-    (_id, url) => new Audio(url),
+    (_id, url) => createMedia(url),
     () =>
       !corralVoice.busy() &&
       !liftVoice.busy() &&
@@ -151,7 +156,9 @@ export function createDriveAudio({
       !lookoutVoice.snapshot().busy &&
       !gateSignalVoice.snapshot().busy,
   );
-  const houseMusic = createHouseMusic(new Audio(HOUSE_MUSIC_URL), () => publish());
+  const houseMusic = createHouseMusic(createMedia(HOUSE_MUSIC_URL, { preload: 'none' }), () =>
+    publish(),
+  );
   let ctx,
     fxBus,
     lookoutBell,
