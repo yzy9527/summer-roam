@@ -1,6 +1,7 @@
 import { reactionAmount } from './animal-drive.js';
 import { createAnimalSleepPose } from './animal-sleep-pose.js';
 import { createAnimalTreePose } from './animal-tree-pose.js';
+import { createLeopardJumpPose } from './gameplay/milk/jump-pose.js';
 import * as THREE from 'three';
 import { landscapeHeight } from './world-queries.js';
 const swinging = (leg) => (leg.runStance === undefined ? !!leg.start : !leg.runStance);
@@ -70,7 +71,7 @@ export function createAnimalAnimation(root, group, profile = {}) {
     jaw = find('Jaw');
   if (!head?.isBone || !find('FL_Upper')?.isBone) return null;
   group.updateMatrixWorld(true);
-  const muzzle = root.getObjectByName('Continuous_ivory_muzzle');
+  const muzzle = root.getObjectByName(profile.contactMesh ?? 'Continuous_ivory_muzzle');
   // The local forward extent is measured in the bind pose, independent of layout yaw.
   const localBox = new THREE.Box3();
   if (muzzle)
@@ -241,6 +242,11 @@ export function createAnimalAnimation(root, group, profile = {}) {
           sleepPose,
         })
       : null;
+  const jumpPose =
+    profile.species === 'leopard'
+      ? createLeopardJumpPose({ root, group, body, bodyRest, restQ, legs, solveLeg: solveCowLeg })
+      : null;
+  let jumpActive = false;
   let treeActive = false;
   let sleeping = false;
   return {
@@ -249,6 +255,25 @@ export function createAnimalAnimation(root, group, profile = {}) {
     contactPoint: () => head.localToWorld(headContact.clone()),
     update(dt, animal, chew, envelope) {
       if (dt <= 0) return;
+      if (jumpPose && animal.milkJump) {
+        jumpActive = true;
+        activity = runAmount = bodyRun = 0;
+        gait = 'jump';
+        lastDistance = animal.distance;
+        lastHeading = animal.heading;
+        lastPosition.copy(group.position);
+        blink = jumpPose.update(dt, animal);
+        return;
+      }
+      if (jumpActive) {
+        jumpActive = false;
+        jumpPose.reset();
+        previousAim.clear();
+        gait = 'walk';
+        lastPosition.copy(group.position);
+        lastDistance = animal.distance;
+        for (const leg of legs) leg.lastPhase = (cycle + leg.offset) % 1;
+      }
       if (treePose && animal.treeClimb) {
         treeActive = true;
         activity = runAmount = bodyRun = 0;
@@ -785,6 +810,7 @@ export function createAnimalAnimation(root, group, profile = {}) {
       blink,
       sleeping,
       tree: treePose?.snapshot(),
+      jump: jumpPose?.snapshot(),
       sleep: sleepPose?.snapshot(),
       head: head.quaternion.toArray(),
       jaw: jaw?.quaternion.toArray() ?? null,

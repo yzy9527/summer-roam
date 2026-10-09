@@ -19,6 +19,7 @@ export function createGameplayTick({
   corral,
   heist,
   rescue,
+  milk,
   campsite,
 }) {
   /** @param {GameFrame} frame */
@@ -38,6 +39,7 @@ export function createGameplayTick({
     corral?.update(dt, player, clockDt, timeOfDay);
     heist?.update(dt, player);
     rescue?.update(dt, player);
+    milk?.update(dt, player, clockDt);
     campsite?.update(dt);
   };
 }

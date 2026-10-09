@@ -25,6 +25,7 @@ export function createFieldQA({
   getCorral = () => null,
   getCalfHeist = () => null,
   getCalfRescue = () => null,
+  getLeopardMilk = () => null,
   getPaddyPloughing = () => null,
   advanceCalfHeist = () => {},
   getCampsite = () => null,
@@ -71,6 +72,7 @@ export function createFieldQA({
     campfire: params.get('campfireview'),
     mountain: params.get('mountainview'),
     tree: params.get('treeview'),
+    milk: params.get('milkview'),
     treeAdvance: 0,
   };
 
@@ -102,12 +104,42 @@ export function createFieldQA({
     step: () => stepDrive(getState(), input, 1 / 60, colliders),
   };
 
+  function setupMilk() {
+    const a = getAnimals()?.animal('hornless-calf'),
+      c = getCorral();
+    if (!a || !c || !getAnimals().interactions.reserveTransport(a)) return false;
+    restoreCalf(a);
+    Object.assign(a, {
+      x: 162,
+      z: 24,
+      heading: Math.PI / 2,
+      target: null,
+      velocity: 0,
+      motion: 0,
+    });
+    a.group.position.set(a.x, landscapeHeight(a.x, a.z) + 0.025, a.z);
+    a.group.rotation.set(0, a.heading, 0, 'YXZ');
+    Object.assign(a.collider, { x: a.x, z: a.z });
+    a.rig = createAnimalAnimation(a.source, a.group, ANIMAL_PROFILES[a.id]);
+    c.finishDelivery(a);
+    Object.assign(getState(), { x: 132, z: 10, heading: 0, speed: 0, steer: 0 });
+    clearInput();
+    refreshCar();
+    resetView();
+    views.milk = 'follow';
+    return true;
+  }
+
   function mount() {
     window.__fieldQA = api;
     const treeAudit = document.createElement('script');
     treeAudit.type = 'application/json';
     treeAudit.id = 'leopard-tree-audit';
     document.body?.append(treeAudit);
+    const milkAudit = document.createElement('script');
+    milkAudit.type = 'application/json';
+    milkAudit.id = 'leopard-milk-audit';
+    document.body?.append(milkAudit);
     const corralAudit = document.createElement('script');
     corralAudit.type = 'application/json';
     corralAudit.id = 'corral-audit';
@@ -156,6 +188,7 @@ export function createFieldQA({
     animalCheck.onclick = () => {
       views.animalId = 'golden-cow';
       views.tree = null;
+      views.milk = null;
       views.animal = true;
       views.vehicle = false;
       setMode('playing');
@@ -368,6 +401,7 @@ export function createFieldQA({
       b.textContent = label;
       b.onclick = () => {
         views.tree = null;
+        views.milk = null;
         views.animal = 'sleep';
         views.vehicle = false;
         views.mountain = null;
@@ -433,6 +467,7 @@ export function createFieldQA({
     grazeCheck.textContent = '当前动物低头检查';
     grazeCheck.onclick = () => {
       views.tree = null;
+      views.milk = null;
       views.animal = true;
       views.vehicle = false;
       setMode('playing');
@@ -554,6 +589,7 @@ export function createFieldQA({
       views.fish = null;
       views.animal = false;
       views.tree = null;
+      views.milk = null;
       views.vehicle = false;
       setMode('playing');
       refreshCamera();
@@ -908,6 +944,43 @@ export function createFieldQA({
           views.report.textContent = '同一小牛直接交给围栏；每30秒独立抽50%，靠近车辆可听到。';
         },
       ],
+      ['送奶准备（小牛入栏）', () => setupMilk()],
+      [
+        '豹拉开始送奶',
+        () => {
+          views.milk = 'follow';
+          getLeopardMilk()?.start();
+        },
+      ],
+      ['送奶推进0.1秒', () => advanceCalfHeist(0.1)],
+      [
+        '送奶下一阶段',
+        async () => {
+          const phase = getLeopardMilk()?.snapshot().phase;
+          const generation = views.treeAdvance;
+          for (
+            let i = 0;
+            i < 4000 &&
+            getLeopardMilk()?.snapshot().phase === phase &&
+            generation === views.treeAdvance;
+            i++
+          ) {
+            advanceCalfHeist(0.05);
+            if (i % 10 === 0) await new Promise((resolve) => setTimeout(resolve, 0));
+          }
+        },
+      ],
+      ['送奶推进1秒', () => advanceCalfHeist(1)],
+      [
+        '送奶推进10秒',
+        async () => {
+          const generation = views.treeAdvance;
+          for (let i = 0; i < 100 && generation === views.treeAdvance; i++) {
+            advanceCalfHeist(0.1);
+            await new Promise((resolve) => setTimeout(resolve, 0));
+          }
+        },
+      ],
       ['围栏叫声推进30秒', () => advanceCalfHeist(30)],
       [
         '围栏与牵牛观察',
@@ -936,14 +1009,24 @@ export function createFieldQA({
       const b = document.createElement('button');
       b.textContent = label;
       if (label === '围栏小牛叫声检查') b.className = 'heist-button';
-      b.onclick = () => {
-        action();
+      b.onclick = async () => {
+        if (b.disabled) return;
         views.animal = views.vehicle = false;
         views.heist = false;
         views.cart = views.zombie = views.fish = null;
         views.corral ||= 'close';
-        setMode('playing');
-        refreshCamera();
+        if (label.startsWith('送奶') || label === '豹拉开始送奶') {
+          views.milk = 'follow';
+          setMode('paused');
+          document.getElementById('pause-panel')?.classList.add('hidden');
+        } else setMode('playing');
+        b.disabled = true;
+        try {
+          await action();
+        } finally {
+          b.disabled = false;
+          refreshCamera();
+        }
       };
       tools.append(b);
     }
@@ -992,6 +1075,21 @@ export function createFieldQA({
       '僵尸关围栏门',
       '逃跑动物观察',
     ]);
+    const milkButtons = new Set([
+      '送奶准备（小牛入栏）',
+      '豹拉开始送奶',
+      '送奶推进0.1秒',
+      '送奶推进1秒',
+      '送奶推进10秒',
+      '送奶下一阶段',
+    ]);
+    if (params.has('milkview'))
+      for (const button of tools.children)
+        if (
+          !milkButtons.has(button.textContent) &&
+          !['围栏门开合', '性能快照', '隐藏验收工具'].includes(button.textContent)
+        )
+          button.style.display = 'none';
     const treeButtons = new Set([
       '豹爬树观察',
       '豹下树检查',
@@ -1012,6 +1110,7 @@ export function createFieldQA({
         if (!corralButtons.has(button.textContent)) views.corral = null;
         if (!treeButtons.has(button.textContent)) {
           views.tree = null;
+          if (!milkButtons.has(button.textContent)) views.milk = null;
           views.treeAdvance++;
         }
         return action(...args);
@@ -1115,6 +1214,7 @@ export function createFieldQA({
     getWoodenCart,
     getCalfHeist,
     getCalfRescue,
+    getLeopardMilk,
     getAnimals,
     getCorral,
     getZombies,
@@ -1230,6 +1330,7 @@ export function createFieldQA({
     views.driftRun = null;
     views.animal = false;
     views.tree = null;
+    views.milk = null;
     views.mountain = null;
     views.fish = null;
     views.vehicle = false;

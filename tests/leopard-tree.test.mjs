@@ -287,3 +287,32 @@ test('blocked entry declines a visit; low descent waits for the vehicle without 
     f.animals.update(0.05, f.car, 'day');
   assert.equal(f.animals.tree.snapshot().phase, 'idle');
 });
+
+test('grounded return immediately permits commands and hands off one original leopard without changing home', async () => {
+  const f = await fixture(),
+    a = f.animals.animal('baola-leopard');
+  const home = { x: a.homeX, z: a.homeZ };
+  assert(f.animals.tree.start(f.car));
+  for (let i = 0; i < 10000 && f.animals.tree.snapshot().phase !== 'returning'; i++) {
+    f.animals.update(0.05, f.car, 'day');
+    if (f.animals.tree.snapshot().phase === 'resting') f.animals.tree.requestDescent();
+  }
+  assert.equal(f.animals.tree.snapshot().phase, 'returning');
+  assert.equal(a.treeClimb, null);
+  for (const command of ['graze', 'turn', 'call', 'rest'])
+    assert.equal(f.animals.actionAvailability(a, command), '');
+  assert.equal(f.animals.interactions.milkAvailability(a), '');
+  const start = { x: a.x, z: a.z };
+  assert(f.animals.graze(a.id));
+  assert.equal(f.animals.tree.snapshot().phase, 'idle');
+  assert.equal(f.animals.tree.owns(a), false);
+  f.tick(0.5, 'day', 0.05);
+  assert.equal(a.x, start.x);
+  assert.equal(a.z, start.z, 'old return no longer moves the leopard');
+  assert(f.animals.turn(a.id), 'tree exit supports a safe turn outside the ordinary home circle');
+  assert(f.animals.interactions.reserveMilk(a));
+  assert.equal(a.transportOwner, 'milk-visit');
+  assert.equal(f.animals.tree.owns(a), false);
+  assert.deepEqual({ x: a.homeX, z: a.homeZ }, home);
+  f.animals.interactions.releaseMilk(a);
+});

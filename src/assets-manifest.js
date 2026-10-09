@@ -48,5 +48,7 @@ export const ASSETS = Object.freeze({
   'wolf-cry': 'audio/wolf.mp3',
   'leopard-cry': 'audio/cat.mp3',
   'leopard-tap': 'audio/cute-cat.mp3',
+  'milk-question': 'audio/haiyouma.mp3',
+  'milk-answer': 'audio/manzu.mp3',
   'audio-credits': 'audio/CREDITS.md',
 });

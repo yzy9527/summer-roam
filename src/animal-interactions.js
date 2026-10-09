@@ -41,6 +41,47 @@ export function createAnimalInteractions(
     canReserveTransport(a) {
       return !!a?.rig && !!a.behavior && !api.owns(a) && a.behavior.state !== 'alert';
     },
+    milkAvailability(a) {
+      if (!a?.rig || a.id !== 'baola-leopard') return '豹拉尚未就绪';
+      if (
+        a.transportOwner ||
+        family.owns(a) ||
+        charge.owns(a) ||
+        encounters.owns(a) ||
+        mountain?.owns(a)
+      )
+        return '豹拉正在参与其他任务';
+      if (tree?.owns(a) && !tree.interruptible?.(a)) return '请先让豹拉安全下树';
+      if (a.behavior.state === 'alert' || a.behavior.driveTime > 0) return '豹拉正在退让';
+      return '';
+    },
+    reserveMilk(a) {
+      if (api.milkAvailability(a)) return false;
+      tree?.interruptReturn?.(a);
+      if (!claimAnimal(a, 'milk-visit')) return false;
+      api.sleep.wake(a);
+      a.target = a.recoil = null;
+      a.velocity = a.motion = a.chargeRun = 0;
+      a.gesture = 0;
+      return true;
+    },
+    releaseMilk(a) {
+      if (!releaseAnimal(a, 'milk-visit')) return false;
+      a.target = a.recoil = null;
+      a.velocity = a.motion = a.chargeRun = 0;
+      a.wait = 3;
+      Object.assign(a.behavior, {
+        state: 'idle',
+        time: 0,
+        down: 0,
+        raised: 0,
+        escape: null,
+        driveTime: 0,
+      });
+      return true;
+    },
+    interruptGroundReturn: (a) => tree?.interruptReturn?.(a) ?? false,
+    commandOwned: (a) => api.owns(a) && !tree?.interruptible?.(a),
     reserveYield(a) {
       if (!api.canReserveTransport(a) || !api.sleep.ready(a)) return false;
       if (!claimAnimal(a, 'task-yield')) return false;

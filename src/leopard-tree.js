@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { encounterRoute } from './animal-encounters.js';
+import { animalPathSearch } from './corral-navigation.js';
 import { landscapeHeight } from './world-queries.js';
-import { TREE_APPROACH, TREE_VISIT } from './leopard-tree-site.js';
+import { TREE_VISIT } from './leopard-tree-site.js';
 
 const angle = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 const ease = (t) => t * t * (3 - 2 * t);
@@ -11,6 +11,8 @@ export function createLeopardTree(animals, tree, safe, random = Math.random) {
   const a = animals.find((a) => a.id === 'baola-leopard');
   let phase = 'idle',
     path = [],
+    search = null,
+    retry = 0,
     nextVisit = drawInterval(),
     phaseTime = 0;
   let s = 0.55,
@@ -42,6 +44,7 @@ export function createLeopardTree(animals, tree, safe, random = Math.random) {
   function release() {
     setPhase('idle');
     path = [];
+    search = null;
     a.target = null;
     a.velocity = 0;
     a.treeClimb = null;
@@ -60,9 +63,11 @@ export function createLeopardTree(animals, tree, safe, random = Math.random) {
     nextVisit = drawInterval();
   }
   function route(goal, car, entry = false) {
-    return encounterRoute(a, goal, (x, z) => safe(x, z, a, car, entry), TREE_APPROACH);
+    const allowed = safe.snapshot?.(a, car, entry) ?? ((x, z) => safe(x, z, a, car, entry));
+    return animalPathSearch({ x: a.x, z: a.z }, goal, allowed, { step: 0.6, padding: 5 });
   }
   function start(car) {
+    if (api.interruptible(a)) api.interruptReturn(a);
     if (
       !a?.rig ||
       !tree ||
@@ -74,10 +79,12 @@ export function createLeopardTree(animals, tree, safe, random = Math.random) {
     )
       return false;
     // The controlled approach reaches the bark; other obstacles retain their margins.
-    const planned = route(tree.entry, car, true);
-    if (!planned) return false;
+    if (!safe(tree.entry.x, tree.entry.z, a, car, true)) return false;
     home = { x: a.homeX, z: a.homeZ };
-    path = planned;
+    path = [];
+    search = route(tree.entry, car, true);
+    retry = 0;
+    delete a.treeExit;
     blocked = 0;
     s = 0.55;
     rest = 0;
@@ -127,7 +134,8 @@ export function createLeopardTree(animals, tree, safe, random = Math.random) {
       a.velocity = 0;
       blocked += dt;
       if (blocked > 1) {
-        path = route(phase === 'approaching' ? tree.entry : home, car, true) ?? [];
+        path = [];
+        search = route(phase === 'approaching' ? tree.entry : home, car, true);
         blocked = 0;
       }
       return false;
@@ -145,11 +153,27 @@ export function createLeopardTree(animals, tree, safe, random = Math.random) {
     onWakeRequest: null,
     available: (actor) => !!tree && actor === a,
     owns: (actor) => actor === a && phase !== 'idle',
+    interruptible: (actor) => actor === a && phase === 'returning' && !a.treeClimb,
+    interruptReturn(actor) {
+      if (!api.interruptible(actor)) return false;
+      release();
+      a.treeExit = true;
+      return true;
+    },
+    resumeReturn(actor) {
+      if (actor !== a || phase !== 'idle' || !a.treeExit) return false;
+      path = [];
+      search = null;
+      retry = 0;
+      setPhase('returning');
+      return true;
+    },
     touchLocked: (actor) => actor === a && !['idle', 'approaching', 'returning'].includes(phase),
     start,
     cancelApproach() {
       if (phase === 'approaching') {
         path = [];
+        search = null;
         setPhase('returning');
       }
     },
@@ -194,7 +218,27 @@ export function createLeopardTree(animals, tree, safe, random = Math.random) {
       a.target = null;
       a.behavior.state = phase;
       if (phase === 'approaching' || phase === 'returning') {
-        if (phase === 'returning' && !path.length) path = route(home, car, true) ?? [];
+        retry = Math.max(0, retry - dt);
+        if (!path.length && retry === 0) {
+          search ??= route(phase === 'approaching' ? tree.entry : home, car, true);
+          const began = performance.now();
+          for (let slices = 0; slices < 96 && performance.now() - began < 1.25; slices++) {
+            const result = search.next();
+            if (result.done) {
+              path = result.value ?? [];
+              search = null;
+              if (!path.length) retry = 0.4;
+              break;
+            }
+          }
+        }
+        if (!path.length && phase === 'approaching') {
+          if (phaseTime > 120) {
+            search = null;
+            setPhase('returning');
+          }
+          return;
+        }
         if (!path.length && phase === 'returning') {
           if (Math.hypot(a.x - home.x, a.z - home.z) < 0.12) release();
           else a.velocity = 0;
@@ -202,6 +246,7 @@ export function createLeopardTree(animals, tree, safe, random = Math.random) {
         }
         if (groundStep(dt, car)) {
           if (phase === 'returning') {
+            delete a.treeExit;
             release();
             return;
           }
@@ -209,6 +254,7 @@ export function createLeopardTree(animals, tree, safe, random = Math.random) {
         }
         if (phase === 'approaching' && phaseTime > 120) {
           path = [];
+          search = null;
           setPhase('returning');
         }
         return;

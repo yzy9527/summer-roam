@@ -19,4 +19,5 @@ export function connectGameplayAudio({ field, audio, getState, setImpact }) {
   field.calfHeist?.connectLookoutAudio(audio.lookoutSound);
   field.calfRescue?.connectAudio(audio.corralSound);
   field.paddyPloughing?.connectAudio(audio.paddyPloughSound);
+  field.leopardMilk?.connectAudio(audio.milkSound);
 }

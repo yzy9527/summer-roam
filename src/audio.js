@@ -23,6 +23,7 @@ import { createPaddyCowVoice } from './paddy-cow-voice.js';
 import { createPaddyPloughAudio } from './paddy-plough-audio.js';
 import { createLookoutVoice, LOOKOUT_VOICE_URL } from './lookout-voice.js';
 import { createSharedAudio } from './audio/shared-media.js';
+import { createMilkVoice, MILK_VOICE_URLS } from './gameplay/milk/voice.js';
 // Original, softly filtered vehicle synthesis. No third-party vehicle recordings.
 export { MUSIC_URL, NIGHT_MUSIC_URL };
 export function vehicleTargets(state, input) {
@@ -109,6 +110,7 @@ export function createDriveAudio({
   const corralVoice = createCorralVoice(
     corralMedia,
     () =>
+      !milkVoice.busy() &&
       !liftVoice.busy() &&
       !howlVoice.busy() &&
       !responseVoice.busy() &&
@@ -120,6 +122,7 @@ export function createDriveAudio({
   const liftVoice = createCalfLiftVoice(
     createMedia(CALF_LIFT_URLS[0]),
     () =>
+      !milkVoice.busy() &&
       !corralVoice.busy() &&
       !howlVoice.busy() &&
       !responseVoice.busy() &&
@@ -145,6 +148,7 @@ export function createDriveAudio({
   const paddyCowVoice = createPaddyCowVoice(
     (_id, url) => createMedia(url),
     () =>
+      !milkVoice.busy() &&
       !corralVoice.busy() &&
       !liftVoice.busy() &&
       !howlVoice.busy() &&
@@ -155,6 +159,21 @@ export function createDriveAudio({
       !bullVoice.snapshot().warning.busy &&
       !lookoutVoice.snapshot().busy &&
       !gateSignalVoice.snapshot().busy,
+  );
+  const milkVoice = createMilkVoice(
+    createMedia(MILK_VOICE_URLS.question),
+    () =>
+      !corralVoice.busy() &&
+      !liftVoice.busy() &&
+      !howlVoice.busy() &&
+      !responseVoice.busy() &&
+      !collisionVoice.busy() &&
+      !calfVoice.snapshot().busy &&
+      !bullVoice.snapshot().busy &&
+      !bullVoice.snapshot().warning.busy &&
+      !paddyCowVoice.snapshot().busy &&
+      !lookoutVoice.busy() &&
+      !gateSignalVoice.busy(),
   );
   const houseMusic = createHouseMusic(createMedia(HOUSE_MUSIC_URL, { preload: 'none' }), () =>
     publish(),
@@ -213,6 +232,7 @@ export function createDriveAudio({
       paddyCowVoice: paddyCowVoice.snapshot(),
       lookoutVoice: lookoutVoice.snapshot(),
       gateSignalVoice: gateSignalVoice.snapshot(),
+      milkVoice: milkVoice.snapshot(),
       effects: {
         enabled: prefs.effects,
         volume: prefs.effectsVolume,
@@ -321,6 +341,11 @@ export function createDriveAudio({
     }
   }
   function apply() {
+    milkVoice.sync({
+      enabled: unlocked && playing && prefs.effects,
+      volume: prefs.effectsVolume,
+      position: corralListenerPosition,
+    });
     paddyCowVoice.sync({
       enabled: unlocked && playing && prefs.effects,
       volume: prefs.effectsVolume,
@@ -372,6 +397,7 @@ export function createDriveAudio({
   function setPlaying(value) {
     playing = value;
     if (!value) {
+      milkVoice.stop();
       corralVoice.stop();
       liftVoice.stop();
       howlVoice.stop();
@@ -400,6 +426,7 @@ export function createDriveAudio({
       playing &&
       prefs.effects &&
       prefs.effectsVolume > 0 &&
+      !milkVoice.busy() &&
       (handoff || collisionVoice.ready()) &&
       !corralVoice.busy() &&
       !liftVoice.busy() &&
@@ -502,6 +529,11 @@ export function createDriveAudio({
         position,
       });
       corralListenerPosition = corralPosition;
+      milkVoice.sync({
+        enabled: unlocked && playing && prefs.effects,
+        volume: prefs.effectsVolume,
+        position: corralListenerPosition,
+      });
       liftVoice.sync({
         enabled: unlocked && playing && prefs.effects,
         volume: prefs.effectsVolume,
@@ -526,6 +558,19 @@ export function createDriveAudio({
       music.update(0, houseMusic.backgroundFactor());
     },
     impact: bump,
+    milkSound(event, notify) {
+      if (event.type === 'milk-voice-stop') {
+        milkVoice.stop();
+        return false;
+      }
+      const accepted = milkVoice.request(
+        event,
+        unlocked && playing && prefs.effects && prefs.effectsVolume > 0,
+        notify,
+      );
+      publish();
+      return accepted;
+    },
     paddyPloughSound(event, notify) {
       if (event.type === 'cow-stop') {
         paddyCowVoice.stop();

@@ -1,3 +1,4 @@
+import { createLeopardMilkVisit } from './gameplay/milk/visit.js';
 import { createGameplayTick } from './gameplay/tick.js';
 import { addLeopardTree } from './leopard-tree-site.js';
 import { assetUrl } from './asset-url.js';
@@ -829,7 +830,8 @@ export async function buildField(
   );
   const campsite = await addCampsiteCookingSet(scene, colliders, warnings);
   let calfHeist = null,
-    calfRescue = null;
+    calfRescue = null,
+    leopardMilk = null;
   const loading = { actors: 'pending' };
   let background;
   function loadBackground() {
@@ -848,6 +850,7 @@ export async function buildField(
     calfRescue = calfHeist
       ? createZombieCalfRescue(scene, colliders, zombies, animals, corral, calfHeist)
       : null;
+    leopardMilk = createLeopardMilkVisit(scene, colliders, animals, corral);
     const qaParams = new URLSearchParams(globalThis.location?.search ?? '');
     if (
       qaParams.has('qa') &&
@@ -896,7 +899,7 @@ export async function buildField(
         calfHeist.holdManual();
       }
     }
-    Object.assign(field, { animals, noharaFamily, calfHeist, calfRescue });
+    Object.assign(field, { animals, noharaFamily, calfHeist, calfRescue, leopardMilk });
     tick = makeTick();
     loading.actors = 'ready';
     return field;
@@ -911,6 +914,7 @@ export async function buildField(
       corral,
       heist: calfHeist,
       rescue: calfRescue,
+      milk: leopardMilk,
       campsite,
     });
   let tick = makeTick();
@@ -928,6 +932,7 @@ export async function buildField(
     corral,
     calfHeist,
     calfRescue,
+    leopardMilk,
     lookout,
     paddyPloughing,
     advanceCalfHeist(seconds, car) {

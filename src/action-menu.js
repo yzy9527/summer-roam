@@ -1,4 +1,14 @@
-const ANIMAL_SLOTS = { tap: 1, call: 2, graze: 3, turn: 4, rest: 5, wake: 5, mountain: 6, tree: 6 };
+const ANIMAL_SLOTS = {
+  tap: 1,
+  call: 2,
+  graze: 3,
+  turn: 4,
+  rest: 5,
+  wake: 5,
+  mountain: 6,
+  tree: 6,
+  milk: 7,
+};
 const SHORT_LABELS = {
   'start-plough': '开始耕田',
   'stop-plough': '结束耕田',
@@ -34,6 +44,7 @@ const ICONS = {
   rest: 'M20 15a9 9 0 1 1-11-12 7 7 0 0 0 11 12',
   wake: 'M12 3v2 M12 19v2 M3 12h2 M19 12h2 M5 5l2 2 M17 17l2 2 M19 5l-2 2 M7 17l-2 2 M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0',
   mountain: 'm2 20 8-15 5 9 3-5 4 11z M7 11l3 2 3-2',
+  milk: 'M5 10h14l-2 11H7z M6 10a6 6 0 0 1 12 0',
   tree: 'm12 2-6 7h3l-5 6h5l-3 4h12l-3-4h5l-5-6h3z M12 19v3',
   'ring-bell': 'M9 4a3 3 0 0 1 6 0 M6 16c2-2 1-9 6-9s4 7 6 9H6z M10 20h4',
   'calf-alarm': 'm12 3 10 18H2z M12 9v5 M12 17h.01',
@@ -107,7 +118,8 @@ export function createActionMenu({ host, actions, execute, status = () => '', on
     const size = Math.max(180, Math.min(280, width - 16, height - 16));
     menu.style.setProperty('--action-size', size + 'px');
     const radius = size * 0.34;
-    const count = target.type === 'animal' ? 6 : slots.length;
+    const count =
+      target.type === 'animal' ? Math.max(6, ...slots.map((s) => s.slot)) : slots.length;
     for (const { slot, button } of slots) {
       const angle = ((-90 + ((slot - 1) * 360) / count) * Math.PI) / 180;
       button.style.left = `calc(50% + ${Math.cos(angle) * radius}px)`;

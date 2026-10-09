@@ -338,7 +338,7 @@ export function createZombieCorral(
     return setGate(false);
   }
   function touch(a, source) {
-    if (a.mode === 'recapture-held' || a.transportOwner === 'plough') return;
+    if (a.mode === 'recapture-held' || ['plough', 'milk-visit'].includes(a.transportOwner)) return;
     a.taps++;
     if (sleep.wake(a, () => touchResponse(a, source))) return;
     touchResponse(a, source);
@@ -406,6 +406,55 @@ export function createZombieCorral(
       pursuit = controller;
     },
     gateState: () => ({ gateAmount, gateOperation: gateController.snapshot() }),
+    milkAvailability(a) {
+      if (
+        !a ||
+        !animals.includes(a) ||
+        a.id !== 'hornless-calf' ||
+        a.mode !== 'confined' ||
+        a.transportOwner !== 'corral'
+      )
+        return '需要一头已经关入围栏的小牛';
+      if (
+        controlled ||
+        recaptureDelivery ||
+        deliveryAwaitSignal ||
+        ploughLoan ||
+        gateAmount !== 0 ||
+        !gateController.settled
+      )
+        return '等待小牛入栏、看守关好门';
+      return '';
+    },
+    reserveMilk(a) {
+      if (this.milkAvailability(a) || !transferAnimal(a, 'corral', 'milk-visit')) return false;
+      directedEscapes.delete(a);
+      a.mode = 'milk-feeding';
+      a.route = [];
+      a.target = null;
+      a.velocity = a.motion = a.chargeRun = 0;
+      emit('animal-stop', a);
+      sleep.wake(a);
+      return true;
+    },
+    milkReady: (a) => a?.transportOwner === 'milk-visit' && sleep.ready(a),
+    finishMilk(a) {
+      if (!animals.includes(a) || !transferAnimal(a, 'milk-visit', 'corral')) return false;
+      a.mode = 'confined';
+      a.route = [];
+      a.target = null;
+      a.wait = 1;
+      a.velocity = a.motion = a.chargeRun = 0;
+      Object.assign(a.behavior, {
+        state: 'idle',
+        time: 0,
+        down: 0,
+        raised: 0,
+        escape: null,
+        driveTime: 0,
+      });
+      return true;
+    },
     ploughAvailability(a) {
       if (!a || !animals.includes(a) || a.id !== 'hornless-calf' || a.mode !== 'confined')
         return '先将小牛抓回牛栏';
@@ -641,7 +690,7 @@ export function createZombieCorral(
       }),
   };
   function updateAnimal(a, dt, timerDt) {
-    if (a.mode === 'recapture-held' || a.transportOwner === 'plough') return;
+    if (a.mode === 'recapture-held' || ['plough', 'milk-visit'].includes(a.transportOwner)) return;
     if (sleep.owns(a)) {
       a.route = [];
       a.velocity = 0;

@@ -322,6 +322,7 @@ try {
       getCorral: () => field?.corral,
       getCalfHeist: () => field?.calfHeist,
       getCalfRescue: () => field?.calfRescue,
+      getLeopardMilk: () => field?.leopardMilk,
       getPaddyPloughing: () => field?.paddyPloughing,
       advanceCalfHeist: (seconds = 10) => field?.advanceCalfHeist(seconds, state),
       getCampsite: () => field?.campsite,

@@ -1,6 +1,14 @@
-/** @typedef {'task-yield'|'heist'|'rescue-defense'|'corral'|'plough'|'recapture'} TransportOwner */
+/** @typedef {'task-yield'|'heist'|'rescue-defense'|'corral'|'plough'|'recapture'|'milk-visit'} TransportOwner */
 /** @typedef {{transportOwner?: TransportOwner}} TransportAnimal */
-const owners = new Set(['task-yield', 'heist', 'rescue-defense', 'corral', 'plough', 'recapture']);
+const owners = new Set([
+  'task-yield',
+  'heist',
+  'rescue-defense',
+  'corral',
+  'plough',
+  'recapture',
+  'milk-visit',
+]);
 /** Transfer only from the expected owner. Domain controllers own pose/collision cleanup. */
 export function transferAnimal(animal, expected, next) {
   if (!animal || !owners.has(next) || animal.transportOwner !== expected) return false;

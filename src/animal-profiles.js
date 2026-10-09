@@ -143,6 +143,7 @@ export const ANIMAL_PROFILES = {
   },
   'baola-leopard': {
     species: 'leopard',
+    contactMesh: 'Black_smiling_mouth_inset',
     sleep: {
       belly: 0.13,
       fore: -0.12,

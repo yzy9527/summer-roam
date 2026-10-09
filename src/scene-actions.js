@@ -72,7 +72,8 @@ export function createSceneActions({
       const valid = confined || meadow.animal(a.id) === a;
       if (!valid) return [];
       const unavailable = (action) => meadow.actionAvailability(a, action);
-      const held = a.mode === 'recapture-held' || a.transportOwner === 'plough';
+      const held =
+        a.mode === 'recapture-held' || ['plough', 'milk-visit'].includes(a.transportOwner);
       add(
         'tap',
         a.id === 'reference-wolf' ? '触摸互动' : '拍一拍',
@@ -85,9 +86,11 @@ export function createSceneActions({
         },
         confined
           ? held
-            ? a.transportOwner === 'plough'
-              ? '正在执行耕田任务'
-              : '正在被抱着'
+            ? a.transportOwner === 'milk-visit'
+              ? '小牛正在喝牛奶'
+              : a.transportOwner === 'plough'
+                ? '正在执行耕田任务'
+                : '正在被抱着'
             : ''
           : unavailable('tap'),
         '当前对象',
@@ -99,14 +102,29 @@ export function createSceneActions({
         () => animalCall({ id: a.id, instanceId: a.instanceId ?? a.id, x: a.x, z: a.z }),
         confined
           ? held
-            ? a.transportOwner === 'plough'
-              ? '正在执行耕田任务'
-              : '正在被抱着'
+            ? a.transportOwner === 'milk-visit'
+              ? '小牛正在喝牛奶'
+              : a.transportOwner === 'plough'
+                ? '正在执行耕田任务'
+                : '正在被抱着'
             : ''
           : unavailable('call'),
         '当前对象',
         '只播放叫声，不触发拍击或追赶',
       );
+      if (a.id === 'baola-leopard' && field.leopardMilk) {
+        const milk = field.leopardMilk,
+          state = milk.snapshot();
+        const active = state.phase !== 'idle';
+        add(
+          'milk',
+          active ? '取消送奶' : '给小牛送奶',
+          () => (active ? milk.cancel() : milk.start(getCar())),
+          active ? (state.cancelled ? '正在带奶桶安全返回' : '') : milk.availability(),
+          '当前对象',
+          '叼奶桶跃过围栏，喂完小牛后带空桶回来',
+        );
+      }
       if (!confined && !a.transportOwner) {
         add(
           'graze',
@@ -326,6 +344,7 @@ export function createSceneActions({
   return {
     actions,
     status(target) {
+      if (target?.animal?.id === 'baola-leopard') return getField()?.leopardMilk?.status() ?? '';
       if (target?.id === 'pvz-flagbearer' || target?.id === 'pvz-ploughman')
         return getField()?.paddyPloughing?.status() ?? '';
       if (target?.id === 'pvz-lookout') {
@@ -373,6 +392,7 @@ export function createSceneActions({
         'put-down',
         'cancel-heist',
         'cancel-rescue',
+        'milk',
       ].includes(id);
       return {
         ok,

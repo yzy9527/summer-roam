@@ -39,5 +39,9 @@ export const RELEASE_BUDGET = Object.freeze({
   // to the measured 1047.3 KiB baseline; allow 3 KiB for this runtime change.
   // Lossless GLB decoding and staged startup add 28.7 KiB to 1049.7 KiB.
   // Measured release: 1078.4 KiB; permit only this decoder/runtime expansion.
-  codeBytes: 1080 * 1024,
+  // Approved leopard milk visit, editable pail, bounded navigation, leap IK
+  // and inspection add about 20 KiB to 1078.4 KiB; binary/file caps stay unchanged.
+  // Approved ground-return interruption, continuous milk routes and supplied
+  // media-driven dialogue measure 1103.8 KiB; retain the binary/file caps.
+  codeBytes: 1104 * 1024,
 });

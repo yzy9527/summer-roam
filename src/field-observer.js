@@ -58,6 +58,7 @@ export function createFieldObserver({ readGame, getRenderer, getWheels, getField
       corral: field.corral?.snapshot(),
       calfHeist: field.calfHeist?.snapshot(),
       calfRescue: field.calfRescue?.snapshot(),
+      leopardMilk: field.leopardMilk?.snapshot(),
       lookout: field.lookout?.snapshot(),
       paddyPloughing: field.paddyPloughing?.snapshot(),
       campsite: field.campsite?.snapshot(),

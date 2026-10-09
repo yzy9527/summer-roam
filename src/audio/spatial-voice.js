@@ -6,7 +6,13 @@ import { setAudioSource } from './shared-media.js';
  */
 export function createSpatialVoice(
   media,
-  { range = 100, canSpeak = () => true, selectSource, repeatPlaying = false } = {},
+  {
+    range = 100,
+    canSpeak = () => true,
+    selectSource,
+    repeatPlaying = false,
+    completionEvents = false,
+  } = {},
 ) {
   media.loop = false;
   media.preload = 'auto';
@@ -20,21 +26,24 @@ export function createSpatialVoice(
     const distance = position ? Math.hypot(event.x - position.x, event.z - position.z) : 0;
     return volume * Math.max(0, 1 - distance / range) ** 2;
   }
-  function stop() {
+  function stop(reason = 'stopped') {
     generation++;
     const previous = active;
     active = null;
     started = false;
     media.pause();
     media.currentTime = 0;
-    previous?.notify('stopped');
+    previous?.notify(reason);
   }
   media.addEventListener('playing', () => {
     if (!active || (started && !repeatPlaying)) return;
     started = true;
     active.notify('playing');
   });
-  for (const type of ['ended', 'error']) media.addEventListener(type, stop);
+  for (const type of ['ended', 'error'])
+    media.addEventListener(type, () =>
+      stop(type === 'ended' && completionEvents ? 'ended' : 'stopped'),
+    );
   return {
     busy: () => !!active,
     stop,

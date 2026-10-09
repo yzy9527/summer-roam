@@ -130,3 +130,25 @@ test('each target exposes only its own actions; animal calls cannot touch or com
     'reset-car',
   ]);
 });
+
+test('original giant recapture cancellation still executes its controller action', () => {
+  let cancelled = 0;
+  const registry = createSceneActions({
+    getField: () => ({
+      animals: { animal: () => ({}) },
+      calfHeist: { snapshot: () => ({ phase: 'waiting' }), manualAvailability: () => '' },
+      calfRescue: {
+        snapshot: () => ({ manual: true, phase: 'chasing' }),
+        manualAvailability: () => '',
+        cancelManual: () => {
+          cancelled++;
+          return true;
+        },
+      },
+    }),
+  });
+  const result = registry.execute({ type: 'actor', id: 'pvz-gargantuar' }, 'cancel-rescue');
+  assert(result.ok);
+  assert.match(result.message, /取消追回任务/);
+  assert.equal(cancelled, 1);
+});

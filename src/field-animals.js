@@ -29,6 +29,22 @@ export const ANIMAL_LAYOUT = [
 
 // Keep a full body margin around scenery, water, vehicles and other animals.
 export function animalPointAllowed(x, z, animal, obstacles, animals, car, partners = []) {
+  if (animal.treeExit) {
+    // A grounded leopard can finish the real tree exit without changing home.
+    return leopardTreeGroundAllowed(
+      x,
+      z,
+      animal,
+      obstacles.filter(
+        (c) =>
+          !c.leopardTree ||
+          Math.hypot(x - c.x, z - c.z) < Math.hypot(animal.x - c.x, animal.z - c.z) - 1e-7,
+      ),
+      animals,
+      car,
+      false,
+    );
+  }
   if (!(animal.id === 'copper-cow' ? inBullPatrol(x, z) : inAnimalMeadow(x, z))) return false;
   if (
     animal.id !== 'copper-cow' &&
@@ -307,11 +323,18 @@ export async function addFieldAnimals(
         });
       })
     : null;
-  const tree = treeSite
-    ? createLeopardTree(animals, treeSite, (x, z, a, car, entry) =>
-        leopardTreeGroundAllowed(x, z, a, obstacles, animals, car, entry),
-      )
-    : null;
+  const treeSafe = (x, z, a, car, entry) =>
+    leopardTreeGroundAllowed(x, z, a, obstacles, animals, car, entry);
+  treeSafe.snapshot = (a, car, entry) => {
+    const fixed = obstacles.map((c) => ({ ...c })),
+      peers = [
+        a,
+        ...animals.filter((b) => b !== a).map((b) => ({ x: b.x, z: b.z, radius: b.radius })),
+      ];
+    const vehicle = car && { ...car };
+    return (x, z) => leopardTreeGroundAllowed(x, z, a, fixed, peers, vehicle, entry);
+  };
+  const tree = treeSite ? createLeopardTree(animals, treeSite, treeSafe) : null;
   let sleepCar = null;
   const interactions = createAnimalInteractions({
     animals,
@@ -420,12 +443,14 @@ export async function addFieldAnimals(
       if (action === 'wake') return sleep.ready(a) ? '已经站起来了' : '';
       if (action === 'tap')
         return mountain?.touchLocked(a) || tree?.touchLocked(a) ? '当前动作不能被触摸打断' : '';
-      if (interactions.owns(a)) return !sleep.ready(a) ? '正在休息或起身' : '正在参与其他互动';
+      if (interactions.commandOwned(a))
+        return !sleep.ready(a) ? '正在休息或起身' : '正在参与其他互动';
       if (a.behavior.state === 'alert' || a.behavior.driveTime > 0) return '正在退让，请稍候';
       return '';
     },
     touch(a, source, car, onTap = () => {}) {
       if (this.actionAvailability(a, 'tap')) return false;
+      interactions.interruptGroundReturn(a);
       if (mountain?.owns(a)) mountain.cancelApproach();
       if (tree?.owns(a)) tree.cancelApproach();
       a.taps++;
@@ -433,7 +458,10 @@ export async function addFieldAnimals(
       return true;
     },
     rest(id = 'golden-cow') {
-      return sleep.rest(animals.find((a) => a.id === id));
+      const a = animals.find((a) => a.id === id);
+      if (this.actionAvailability(a, 'rest')) return false;
+      interactions.interruptGroundReturn(a);
+      return sleep.rest(a);
     },
     wake(id = 'golden-cow') {
       const a = animals.find((a) => a.id === id);
@@ -475,12 +503,13 @@ export async function addFieldAnimals(
     },
     turn(id = 'golden-cow') {
       const a = animals.find((a) => a.id === id);
-      if (!a?.behavior || mountain?.owns(a) || tree?.owns(a)) return;
+      if (!a?.behavior || mountain?.owns(a)) return;
       if (!sleep.ready(a)) {
         sleep.wake(a);
         return;
       }
       if (this.actionAvailability(a, 'turn')) return false;
+      interactions.interruptGroundReturn(a);
       const source = { x: a.x + Math.sin(a.heading) * 2, z: a.z + Math.cos(a.heading) * 2 };
       const target = cowRetreatTarget(a, source, (x, z) =>
         animalPointAllowed(x, z, a, obstacles, animals, null),
@@ -495,12 +524,13 @@ export async function addFieldAnimals(
     },
     graze(id = 'golden-cow') {
       const a = animals.find((a) => a.id === id);
-      if (!a?.behavior || mountain?.owns(a) || tree?.owns(a)) return;
+      if (!a?.behavior || mountain?.owns(a)) return;
       if (!sleep.ready(a)) {
         sleep.wake(a);
         return;
       }
       if (this.actionAvailability(a, 'graze')) return false;
+      interactions.interruptGroundReturn(a);
       Object.assign(a.behavior, { state: 'lowering', time: 0, duration: 1.6, down: 0, raised: 0 });
       a.target = null;
       a.velocity = 0;
@@ -546,6 +576,7 @@ export async function addFieldAnimals(
         );
       if (inFront || a.transportOwner || mountain?.touchLocked(a) || tree?.touchLocked(a))
         return false;
+      interactions.interruptGroundReturn(a);
       if (mountain?.owns(a)) mountain.cancelApproach();
       if (tree?.owns(a)) tree.cancelApproach();
       a.taps++;
@@ -615,6 +646,12 @@ export async function addFieldAnimals(
         }
         a.group.visible = Math.hypot(a.x - viewer.x, a.z - viewer.z) < 90;
         if (dt <= 0) continue;
+        if (
+          a.treeExit &&
+          inAnimalMeadow(a.x, a.z) &&
+          Math.hypot(a.x - a.homeX, a.z - a.homeZ) <= a.range
+        )
+          delete a.treeExit;
         a.clock += dt;
         a.wait -= dt;
         if (
@@ -649,6 +686,7 @@ export async function addFieldAnimals(
           }
           if (!['idle', 'walking'].includes(a.behavior.state)) a.wait = Math.max(a.wait, 0.3);
         }
+        if (a.treeExit && !owned(a) && !a.target && a.wait <= 0) tree?.resumeReturn(a);
         if (!owned(a) && !a.target && a.wait <= 0) {
           for (let i = 0; i < 12; i++) {
             const angle = Math.random() * Math.PI * 2,

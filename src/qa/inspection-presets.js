@@ -17,6 +17,7 @@ export function createInspectionPresets({
   getWoodenCart,
   getCalfHeist,
   getCalfRescue,
+  getLeopardMilk,
   getAnimals,
   getCorral,
   getZombies,
@@ -25,6 +26,25 @@ export function createInspectionPresets({
   bridgeInspection,
 }) {
   function updateInspectionPreset(camera) {
+    if (views.milk && getLeopardMilk?.()) {
+      const milk = getLeopardMilk(),
+        a = milk.leopard;
+      const audit = document.getElementById('leopard-milk-audit');
+      if (audit) audit.textContent = JSON.stringify(milk.snapshot());
+      const { x, y, z } = a.group.position;
+      if (
+        views.milk === 'pen' ||
+        ['feeding', 'clearing-calf', 'collecting', 'placing'].includes(milk.snapshot().phase)
+      ) {
+        const base = drivingHeight(164, 23);
+        camera.position.set(169, base + 3.5, 18.5);
+        camera.lookAt(164.5, base + 0.75, 23.2);
+      } else {
+        camera.position.set(x + Math.cos(a.heading) * 5, y + 2.1, z - Math.sin(a.heading) * 5);
+        camera.lookAt(x + Math.sin(a.heading) * 0.4, y + 0.55, z + Math.cos(a.heading) * 0.4);
+      }
+      return true;
+    }
     if (
       views.animal ||
       views.vehicle ||
