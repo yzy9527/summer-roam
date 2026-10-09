@@ -14,7 +14,8 @@ import { createCalfTransportPose, restoreCalf } from './calf-transport-pose.js';
 import { createAnimalAnimation } from './animal-animation.js';
 import { ANIMAL_PROFILES } from './animal-profiles.js';
 import { drivingHeight } from './world-queries.js';
-import { dryAnimalPoint, findAnimalPath } from './corral-navigation.js';
+import { dryAnimalPoint, findAnimalPath, animalPathSearch } from './corral-navigation.js';
+import { vehicleObstacleGap } from './vehicle-collision.js';
 import { createTaskClearance, separatesCircle } from './task-clearance.js';
 import { LOOKOUT_NOTICE_SECONDS } from './zombie-lookout.js';
 import { advanceCartPose } from './crew-cart-navigation.js';
@@ -93,6 +94,10 @@ export function createZombieCalfHeist(
     carry = false,
     phaseHistory = ['waiting'];
   const walkStates = new Map();
+  // Both boarding actors share this display-frame budget. A per-actor slice
+  // leaves time for the other crew member even when the first route is complex.
+  let boardingSearchMs = 0,
+    boardingSearchSlices = 0;
   const { transitions, transitionPose, updateTransition } = createCrewTransitions({
     scene,
     zombies,
@@ -408,6 +413,55 @@ export function createZombieCalfHeist(
       (c) => ignoreOwn(c) || c.woodenCart,
     );
   }
+  function searchBoardingRoute(actor, target, navigation, ignore) {
+    if (
+      navigation.search &&
+      Math.hypot(
+        actor.object.position.x - navigation.searchStart.x,
+        actor.object.position.z - navigation.searchStart.z,
+      ) > 0.1
+    )
+      navigation.search = null;
+    if (!navigation.search) {
+      const start = { x: actor.object.position.x, z: actor.object.position.z },
+        vehicle = player && { ...player },
+        radius = actor.collider.radius,
+        margin = actor.scripted ? 0.12 : 0.25,
+        obstacles = colliders.filter((c) => !ignore(c)).map((c) => ({ ...c }));
+      // Cached search cells must describe one obstacle snapshot across frames.
+      // canStand supplies the existing terrain rules; movement below still
+      // checks the live colliders and player vehicle before every actual step.
+      const allowed = (x, z) =>
+        zombies.canStand(actor.layout.id, { x, z }, null, { ignore: () => true }) &&
+        (!vehicle ||
+          vehicleObstacleGap(vehicle.x, vehicle.z, vehicle.heading ?? 0, { x, z, radius }) > 0.4) &&
+        !obstacles.some(
+          (c) =>
+            !((c.zombie || c.animal) && separatesCircle(start, { x, z }, radius, c, margin)) &&
+            Math.hypot(x - c.x, z - c.z) < radius + c.radius + margin,
+        );
+      navigation.search = animalPathSearch(start, { x: target.x, z: target.z }, allowed, {
+        step: 0.35,
+        padding: 9,
+      });
+      navigation.searchStart = start;
+    }
+    const started = performance.now(),
+      deadline = started + Math.max(0, Math.min(1, 2 - boardingSearchMs));
+    let actorSlices = 0;
+    while (actorSlices < 256 && boardingSearchSlices < 512 && performance.now() < deadline) {
+      actorSlices++;
+      boardingSearchSlices++;
+      const result = navigation.search.next();
+      if (result.done) {
+        navigation.route = result.value ?? [];
+        navigation.search = null;
+        navigation.retry = 1;
+        break;
+      }
+    }
+    boardingSearchMs += performance.now() - started;
+  }
   function walk(
     actor,
     target,
@@ -426,6 +480,7 @@ export function createZombieCalfHeist(
       Math.hypot(target.x - navigation.goal.x, target.z - navigation.goal.z) > 0.1
     ) {
       navigation.route = [];
+      navigation.search = null;
       navigation.goal = { x: target.x, z: target.z };
     }
     const ignore = (c) =>
@@ -477,12 +532,15 @@ export function createZombieCalfHeist(
     const d = Math.hypot(actor.object.position.x - target.x, actor.object.position.z - target.z);
     if (d < 0.035) return true;
     if (!navigation.route.length && navigation.retry === 0) {
-      navigation.route =
-        findAnimalPath(actor.object.position, target, allowed, {
-          step: 0.35,
-          padding: carried && phase === 'carry-to-cart' ? 16 : 9,
-        }) ?? [];
-      navigation.retry = 1;
+      if (phase === 'crew-boarding') searchBoardingRoute(actor, target, navigation, ignore);
+      else {
+        navigation.route =
+          findAnimalPath(actor.object.position, target, allowed, {
+            step: 0.35,
+            padding: carried && phase === 'carry-to-cart' ? 16 : 9,
+          }) ?? [];
+        navigation.retry = 1;
+      }
     }
     if (!navigation.route.length) return false;
     const p = actor.object.position,
@@ -865,6 +923,7 @@ export function createZombieCalfHeist(
         return;
       }
       dt = Math.min(dt, 0.1);
+      boardingSearchMs = boardingSearchSlices = 0;
       time += dt;
       elapsed += dt;
       if (signalEvent) {

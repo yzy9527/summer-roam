@@ -314,6 +314,68 @@ function placeCrewBySteps(f) {
   }
 }
 
+test('manual capture slices the initial boarding search, freezes pending work and completes both seats', async () => {
+  const f = await fixture('underarm', true),
+    canStand = f.zombies.canStand.bind(f.zombies);
+  let checks = new Map();
+  f.zombies.canStand = (id, ...args) => {
+    checks.set(id, (checks.get(id) ?? 0) + 1);
+    return canStand(id, ...args);
+  };
+  assert(f.heist.startManual());
+  let boardingFrames = 0,
+    checkedPendingPause = false;
+  for (let i = 0; i < 60 * 60 && f.heist.snapshot().phase !== 'outbound'; i++) {
+    checks = new Map();
+    f.tick(1 / 60);
+    assert(
+      [...checks.values()].reduce((sum, count) => sum + count, 0) <= 512,
+      'The crew must share a bounded search slice rather than finish all searches in one frame',
+    );
+    if (f.heist.snapshot().phase !== 'crew-boarding') continue;
+    boardingFrames++;
+    if (!checkedPendingPause) {
+      const before = f.heist.snapshot(),
+        driver = f.zombies.actor('pvz-conehead'),
+        giant = f.zombies.actor('pvz-gargantuar');
+      assert(checks.get(driver.layout.id) > 0 && checks.get(giant.layout.id) > 0);
+      assert.equal(before.route.length, 0, 'The complex initial search must remain pending');
+      checks = new Map();
+      for (let j = 0; j < 5; j++) f.tick(0);
+      assert.equal(checks.size, 0, 'Pause must not advance pending searches');
+      assert.deepEqual(f.heist.snapshot(), before);
+      checkedPendingPause = true;
+    }
+  }
+  assert(checkedPendingPause && boardingFrames > 1);
+  assert.equal(f.heist.snapshot().phase, 'outbound');
+  for (const id of ['pvz-conehead', 'pvz-gargantuar']) {
+    const actor = f.zombies.actor(id);
+    assert(actor.seated && !actor.transitioning);
+    assert.equal(actor.object.parent, f.cart.root);
+  }
+});
+
+test('boarding rechecks a player entering after the search snapshot and resumes when clear', async () => {
+  const f = await fixture('underarm'),
+    giant = f.zombies.actor('pvz-gargantuar');
+  assert(f.heist.startManual());
+  f.tick(1 / 60);
+  assert.equal(f.heist.snapshot().route.length, 0, 'Initial giant search is still pending');
+  const start = giant.object.position.clone(),
+    car = { ...f.car };
+  Object.assign(f.car, { x: start.x, z: start.z });
+  for (let i = 0; i < 60 * 10; i++) {
+    f.tick(1 / 60);
+    assert(giant.object.position.distanceTo(start) < 1e-9, 'A stale path cannot bypass the player');
+    assert.equal(f.heist.snapshot().phase, 'crew-boarding');
+  }
+  Object.assign(f.car, car);
+  for (let i = 0; i < 60 * 60 && f.heist.snapshot().phase !== 'outbound'; i++) f.tick(1 / 60);
+  assert.equal(f.heist.snapshot().phase, 'outbound');
+  assert(giant.seated && !giant.transitioning);
+});
+
 test('alarm crew walks and seats concurrently at 30/60/120fps; departure waits for both settled poses', async () => {
   for (const fps of [30, 60, 120]) {
     const f = await fixture('underarm', true);
