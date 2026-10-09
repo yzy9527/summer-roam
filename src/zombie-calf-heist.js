@@ -94,6 +94,7 @@ export function createZombieCalfHeist(
     carry = false,
     phaseHistory = ['waiting'];
   const walkStates = new Map();
+  const boardingTerrain = new Map();
   // Both boarding actors share this display-frame budget. A per-actor slice
   // leaves time for the other crew member even when the first route is complex.
   let boardingSearchMs = 0,
@@ -170,6 +171,7 @@ export function createZombieCalfHeist(
   }
   function setPhase(next) {
     phase = next;
+    if (next !== 'crew-boarding') boardingTerrain.clear();
     time = 0;
     for (const actor of walkStates.keys())
       if ((next !== 'pat-guard' || actor !== giant) && (!driverParking || actor !== driver))
@@ -427,15 +429,46 @@ export function createZombieCalfHeist(
         vehicle = player && { ...player },
         radius = actor.collider.radius,
         margin = actor.scripted ? 0.12 : 0.25,
-        obstacles = colliders.filter((c) => !ignore(c)).map((c) => ({ ...c }));
+        grid = new Map();
+      // The nine-metre search padding includes rounded grid endpoints. Keep
+      // every collider intersecting that domain, including its full radius.
+      const minX = Math.min(start.x, target.x) - 11,
+        maxX = Math.max(start.x, target.x) + 11,
+        minZ = Math.min(start.z, target.z) - 11,
+        maxZ = Math.max(start.z, target.z) + 11;
+      for (const c of colliders) {
+        const r = radius + c.radius + margin;
+        if (ignore(c) || c.x + r < minX || c.x - r > maxX || c.z + r < minZ || c.z - r > maxZ)
+          continue;
+        const obstacle = { ...c };
+        // Inflate obstacle buckets by the actor footprint, so each clearance
+        // sample only visits its own bucket without missing large obstacles.
+        for (let x = Math.floor((c.x - r) / 4); x <= Math.floor((c.x + r) / 4); x++)
+          for (let z = Math.floor((c.z - r) / 4); z <= Math.floor((c.z + r) / 4); z++) {
+            const key = x + ',' + z;
+            if (!grid.has(key)) grid.set(key, []);
+            grid.get(key).push(obstacle);
+          }
+      }
+      const terrainAllowed = (x, z) => {
+        const key = radius + ':' + x + ',' + z;
+        if (!boardingTerrain.has(key)) {
+          if (boardingTerrain.size >= 12000) boardingTerrain.clear();
+          boardingTerrain.set(
+            key,
+            zombies.canStand(actor.layout.id, { x, z }, null, { terrainOnly: true }),
+          );
+        }
+        return boardingTerrain.get(key);
+      };
       // Cached search cells must describe one obstacle snapshot across frames.
       // canStand supplies the existing terrain rules; movement below still
       // checks the live colliders and player vehicle before every actual step.
       const allowed = (x, z) =>
-        zombies.canStand(actor.layout.id, { x, z }, null, { ignore: () => true }) &&
+        terrainAllowed(x, z) &&
         (!vehicle ||
           vehicleObstacleGap(vehicle.x, vehicle.z, vehicle.heading ?? 0, { x, z, radius }) > 0.4) &&
-        !obstacles.some(
+        !(grid.get(Math.floor(x / 4) + ',' + Math.floor(z / 4)) ?? []).some(
           (c) =>
             !((c.zombie || c.animal) && separatesCircle(start, { x, z }, radius, c, margin)) &&
             Math.hypot(x - c.x, z - c.z) < radius + c.radius + margin,
@@ -446,10 +479,21 @@ export function createZombieCalfHeist(
       });
       navigation.searchStart = start;
     }
+    const otherPending = boardingCrew.some(
+      (member) =>
+        member.actor !== actor &&
+        ['approach', 'step'].includes(member.stage) &&
+        !walkStates.get(member.actor)?.route.length &&
+        !(walkStates.get(member.actor)?.retry > 0),
+    );
     const started = performance.now(),
-      deadline = started + Math.max(0, Math.min(1, 2 - boardingSearchMs));
+      deadline = started + Math.max(0, Math.min(otherPending ? 1 : 2, 2 - boardingSearchMs));
     let actorSlices = 0;
-    while (actorSlices < 256 && boardingSearchSlices < 512 && performance.now() < deadline) {
+    while (
+      actorSlices < (otherPending ? 256 : 512) &&
+      boardingSearchSlices < 512 &&
+      performance.now() < deadline
+    ) {
       actorSlices++;
       boardingSearchSlices++;
       const result = navigation.search.next();

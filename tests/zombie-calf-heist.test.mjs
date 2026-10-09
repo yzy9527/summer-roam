@@ -12,6 +12,7 @@ import { CORRAL } from '../src/corral-model.js';
 import { createZombieCalfHeist, CALF_RENDEZVOUS } from '../src/zombie-calf-heist.js';
 import { createTaskClearance } from '../src/task-clearance.js';
 import { landscapeHeight } from '../src/world-queries.js';
+import { corridorColliders } from '../src/irrigation-style.js';
 import {
   createZombieLookout,
   LOOKOUT_SITE,
@@ -356,9 +357,51 @@ test('manual capture slices the initial boarding search, freezes pending work an
   }
 });
 
+test('boarding search stays local with the real irrigation obstacles and bounded work', async (t) => {
+  const f = await fixture('underarm', true),
+    giant = f.zombies.actor('pvz-gargantuar'),
+    canals = corridorColliders(),
+    canStand = f.zombies.canStand.bind(f.zombies),
+    samples = new Set();
+  assert(canals.length > 1500, 'Use the full scene irrigation density');
+  f.colliders.push(...canals);
+  // Fix the clock to exercise the operation cap independently of machine load.
+  // The production deadline can yield earlier; measured latency is checked separately.
+  t.mock.method(performance, 'now', () => 0);
+  f.zombies.canStand = (id, point, car, options) => {
+    if (options?.terrainOnly) {
+      const key = f.zombies.actor(id).collider.radius + ':' + point.x + ',' + point.z;
+      assert(!samples.has(key), 'Static terrain samples must be shared and reused');
+      samples.add(key);
+    }
+    return canStand(id, point, car, options);
+  };
+  assert(f.heist.startManual());
+  let boardingFrames = 0,
+    acted = false;
+  for (let i = 0; i < 60 * 6; i++) {
+    const position = giant.object.position.clone(),
+      yaw = giant.object.rotation.y;
+    f.tick(1 / 60);
+    if (f.heist.snapshot().phase !== 'crew-boarding') continue;
+    boardingFrames++;
+    if (
+      giant.object.position.distanceTo(position) > 1e-6 ||
+      Math.abs(giant.object.rotation.y - yaw) > 1e-6
+    ) {
+      acted = true;
+      break;
+    }
+  }
+  assert(acted, 'The giant must start acting with the actual scene obstacles');
+  assert(boardingFrames <= 90, `Search must fit 90 bounded work frames, got ${boardingFrames}`);
+  assert(samples.size < 12000, 'Terrain cache must remain within its boarding bound');
+});
+
 test('boarding rechecks a player entering after the search snapshot and resumes when clear', async () => {
   const f = await fixture('underarm'),
     giant = f.zombies.actor('pvz-gargantuar');
+  f.colliders.push(...corridorColliders());
   assert(f.heist.startManual());
   f.tick(1 / 60);
   assert.equal(f.heist.snapshot().route.length, 0, 'Initial giant search is still pending');

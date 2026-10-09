@@ -86,6 +86,7 @@ export function createZombieController(sources, colliders = [], groundHeight = d
     ignore = () => false,
     handling = false,
     heading = actor.object.rotation.y,
+    terrainOnly = false,
   ) {
     const radius = actor.collider.radius;
     for (const [dx, dz] of [
@@ -102,6 +103,9 @@ export function createZombieController(sources, colliders = [], groundHeight = d
         insidePaddy(p.x + dx, p.z + dz, roadPoint, 0.3)
       )
         return false;
+    // Boarding path searches index their own frozen obstacle snapshot. Avoid
+    // scanning live colliders for a query that only needs the shared terrain.
+    if (terrainOnly) return true;
     if (
       colliders.some((c) => {
         if (c === actor.collider || ignore(c)) return false;
@@ -252,9 +256,9 @@ export function createZombieController(sources, colliders = [], groundHeight = d
       actor.patrolGoal = null;
       actor.blockedFor = 0;
     },
-    canStand(id, point, car, { ignore } = {}) {
+    canStand(id, point, car, { ignore, terrainOnly = false } = {}) {
       const a = actors.find((a) => a.layout.id === id);
-      return a ? safe(a, point, car, ignore) : false;
+      return a ? safe(a, point, car, ignore, false, a.object.rotation.y, terrainOnly) : false;
     },
     take(id) {
       const actor = actors.find((a) => a.layout.id === id && !a.seated);
