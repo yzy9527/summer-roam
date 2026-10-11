@@ -1,3 +1,4 @@
+import { message } from './messages.js';
 import { publishActors } from './loading/actor-publication.js';
 import { createLeopardTree } from './leopard-tree.js';
 import { leopardTreeGroundAllowed } from './leopard-tree-site.js';
@@ -438,14 +439,18 @@ export async function addFieldAnimals(
     tree,
     sleep,
     actionAvailability(a, action) {
-      if (!animals.includes(a) || !a?.rig || !a.behavior) return '动物暂不可用';
-      if (a.transportOwner) return '正在搬运或圈养中';
-      if (action === 'wake') return sleep.ready(a) ? '已经站起来了' : '';
+      if (!animals.includes(a) || !a?.rig || !a.behavior)
+        return message('reason.animalUnavailable');
+      if (a.transportOwner) return message('reason.transported');
+      if (action === 'wake') return sleep.ready(a) ? message('reason.standing') : '';
       if (action === 'tap')
-        return mountain?.touchLocked(a) || tree?.touchLocked(a) ? '当前动作不能被触摸打断' : '';
+        return mountain?.touchLocked(a) || tree?.touchLocked(a)
+          ? message('reason.touchLocked')
+          : '';
       if (interactions.commandOwned(a))
-        return !sleep.ready(a) ? '正在休息或起身' : '正在参与其他互动';
-      if (a.behavior.state === 'alert' || a.behavior.driveTime > 0) return '正在退让，请稍候';
+        return !sleep.ready(a) ? message('reason.resting') : message('reason.interacting');
+      if (a.behavior.state === 'alert' || a.behavior.driveTime > 0)
+        return message('reason.yielding');
       return '';
     },
     touch(a, source, car, onTap = () => {}) {

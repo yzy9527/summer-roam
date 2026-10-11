@@ -25,7 +25,7 @@ export const ZOMBIE_LAYOUT = Object.freeze(
     },
     {
       id: 'pvz-gargantuar',
-      label: '巨型僵尸',
+      label: '巨人僵尸',
       x: STARTING_PLATFORM.x + 23,
       z: 17,
       scale: 0.7,

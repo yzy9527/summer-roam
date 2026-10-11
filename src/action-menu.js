@@ -1,3 +1,5 @@
+import { createI18n } from './i18n/index.js';
+import { message } from './messages.js';
 const ANIMAL_SLOTS = {
   tap: 1,
   call: 2,
@@ -10,31 +12,31 @@ const ANIMAL_SLOTS = {
   milk: 7,
 };
 const SHORT_LABELS = {
-  'start-plough': '开始耕田',
-  'stop-plough': '结束耕田',
-  tap: '拍一拍',
-  call: '叫一声',
-  graze: '吃草',
-  turn: '转身',
-  rest: '休息',
-  wake: '起身',
-  'hold-calf': '抱起小牛',
-  'put-down': '放下小牛',
-  'recapture-calf': '追回小牛',
-  'carry-mode': '切换抱法',
-  'capture-calf': '出车抓牛',
-  'cancel-heist': '取消任务',
-  'cancel-rescue': '取消追回',
-  'open-gate': '开门',
-  'close-gate': '关门',
-  'guard-close': '请关门',
-  'ring-bell': '摇铃铛',
-  'calf-alarm': '离群警报',
-  camera: '视角复位',
-  'light-off': '关闭车灯',
-  'light-low': '近光灯',
-  'light-high': '远光灯',
-  'reset-car': '回到起点',
+  'start-plough': message('actions.startPlough'),
+  'stop-plough': message('actions.endPlough'),
+  tap: message('actions.tap'),
+  call: message('actions.call'),
+  graze: message('actions.graze'),
+  turn: message('actions.shortTurn'),
+  rest: message('actions.shortRest'),
+  wake: message('actions.wake'),
+  'hold-calf': message('actions.hold'),
+  'put-down': message('actions.lower'),
+  'recapture-calf': message('actions.shortRecapture'),
+  'carry-mode': message('actions.shortCarry'),
+  'capture-calf': message('actions.capture'),
+  'cancel-heist': message('actions.shortCancel'),
+  'cancel-rescue': message('actions.shortCancelRescue'),
+  'open-gate': message('actions.shortOpen'),
+  'close-gate': message('actions.shortClose'),
+  'guard-close': message('actions.shortGuard'),
+  'ring-bell': message('actions.ring'),
+  'calf-alarm': message('actions.shortAlarm'),
+  camera: message('actions.shortCamera'),
+  'light-off': message('actions.lightOff'),
+  'light-low': message('actions.lightLow'),
+  'light-high': message('actions.lightHigh'),
+  'reset-car': message('actions.shortReset'),
 };
 const ICONS = {
   tap: 'M8 13V5a2 2 0 0 1 4 0v6-7a2 2 0 0 1 4 0v8-5a2 2 0 0 1 4 0v8c0 5-3 8-7 8h-1c-2 0-3-1-4-3l-4-6a2 2 0 0 1 3-2l2 2',
@@ -87,13 +89,21 @@ function createIcon(doc, id) {
   svg.append(path);
   return svg;
 }
-export function createActionMenu({ host, actions, execute, status = () => '', onOpen, onResult }) {
+export function createActionMenu({
+  host,
+  actions,
+  execute,
+  status = () => '',
+  onOpen,
+  onResult,
+  i18n = createI18n(),
+}) {
   const doc = host.ownerDocument;
   const menu = doc.createElement('section');
   menu.className = 'action-menu';
   menu.hidden = true;
   menu.setAttribute('role', 'dialog');
-  menu.setAttribute('aria-label', '对象动作圈');
+  menu.setAttribute('aria-label', i18n.t('actions.dialog'));
   menu.tabIndex = -1;
   host.append(menu);
   let target = null,
@@ -138,10 +148,17 @@ export function createActionMenu({ host, actions, execute, status = () => '', on
     onResult(result.message);
   }
   function render() {
-    const list = actions(target),
-      current = status(target);
+    const list = actions(target).map((action) => ({
+        ...action,
+        labelCode: action.label?.code,
+        label: i18n.format(action.label),
+        reason: i18n.format(action.reason),
+        detail: i18n.format(action.detail),
+      })),
+      current = i18n.format(status(target));
     if (!list.length) return close(true);
     const nextSignature = JSON.stringify([
+      i18n.getLocale(),
       current,
       list.map(({ id, label, reason, detail }) => [id, label, reason, detail]),
     ]);
@@ -153,19 +170,16 @@ export function createActionMenu({ host, actions, execute, status = () => '', on
     const wheel = doc.createElement('div'),
       hub = doc.createElement('header'),
       title = doc.createElement('strong'),
-      hint = doc.createElement('span'),
       dismiss = doc.createElement('button'),
       note = doc.createElement('p');
     wheel.className = 'action-menu-wheel';
     hub.className = 'action-menu-hub';
-    title.textContent = target.name;
-    hint.textContent = '当前对象';
-    hint.className = 'action-menu-target';
+    title.textContent = i18n.format(target.name);
     dismiss.type = 'button';
-    dismiss.textContent = '取消 · Esc';
-    dismiss.setAttribute('aria-label', '关闭动作圈');
+    dismiss.textContent = i18n.t('actions.cancel');
+    dismiss.setAttribute('aria-label', i18n.t('actions.close'));
     dismiss.onclick = () => close(true);
-    hub.append(hint, title, dismiss);
+    hub.append(title, dismiss);
     wheel.append(hub);
     note.className = 'action-menu-status';
     note.id = 'action-menu-status';
@@ -184,17 +198,29 @@ export function createActionMenu({ host, actions, execute, status = () => '', on
       button.setAttribute('aria-disabled', String(!!action.reason));
       button.setAttribute(
         'aria-label',
-        `${action.label}，快捷键 ${slot}${action.reason ? '，' + action.reason : ''}`,
+        i18n.t('actions.shortcut', {
+          action: action.label,
+          slot,
+          reason: action.reason ? i18n.t('actions.reasonSuffix', { reason: action.reason }) : '',
+        }),
       );
       button.setAttribute('aria-describedby', note.id);
       if (action.reason) button.setAttribute('title', action.reason);
-      label.textContent = ['mountain', 'tree'].includes(action.id)
-        ? action.label
-        : action.id === 'tap' && target.animal?.id === 'reference-wolf'
-          ? '触摸'
-          : action.id === 'graze' && ['reference-wolf', 'baola-leopard'].includes(target.animal?.id)
-            ? '嗅地'
-            : SHORT_LABELS[action.id] || action.label;
+      label.textContent =
+        action.id === 'milk'
+          ? i18n.t(
+              action.labelCode === 'actions.cancelMilk'
+                ? 'actions.shortCancelMilk'
+                : 'actions.shortMilk',
+            )
+          : ['mountain', 'tree'].includes(action.id)
+            ? action.label
+            : action.id === 'tap' && target.animal?.id === 'reference-wolf'
+              ? i18n.t('actions.shortTouch')
+              : action.id === 'graze' &&
+                  ['reference-wolf', 'baola-leopard'].includes(target.animal?.id)
+                ? i18n.t('actions.shortSniff')
+                : i18n.format(SHORT_LABELS[action.id] || action.label);
       key.textContent = String(slot);
       button.append(createIcon(doc, action.id), label, key);
       const describe = () => {
@@ -238,13 +264,11 @@ export function createActionMenu({ host, actions, execute, status = () => '', on
     }
     return true;
   }
-  doc.addEventListener(
-    'pointerdown',
-    (event) => {
-      if (!menu.hidden && !menu.contains(event.target)) close();
-    },
-    true,
-  );
+  const outsidePointer = (event) => {
+    if (!menu.hidden && !menu.contains(event.target)) close();
+  };
+  const onResize = () => close();
+  doc.addEventListener('pointerdown', outsidePointer, true);
   menu.addEventListener('contextmenu', (event) => event.preventDefault());
   menu.addEventListener('keydown', (event) => {
     if (handleKey(event)) return;
@@ -267,8 +291,19 @@ export function createActionMenu({ host, actions, execute, status = () => '', on
       items[next]?.focus();
     }
   });
-  doc.defaultView.addEventListener('resize', () => close());
+  doc.defaultView.addEventListener('resize', onResize);
+  const unsubscribe = i18n.subscribe(() => {
+    menu.setAttribute('aria-label', i18n.t('actions.dialog'));
+    if (!menu.hidden) render();
+  });
   return {
+    dispose() {
+      close();
+      unsubscribe();
+      doc.removeEventListener('pointerdown', outsidePointer, true);
+      doc.defaultView.removeEventListener('resize', onResize);
+      menu.remove();
+    },
     get open() {
       return !menu.hidden;
     },

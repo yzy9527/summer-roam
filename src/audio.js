@@ -1,3 +1,5 @@
+import { createI18n } from './i18n/index.js';
+import { message } from './messages.js';
 import { createCalfLiftVoice, CALF_LIFT_URLS } from './calf-lift-voice.js';
 import { createWolfHowlVoice, WOLF_HOWL_URL } from './wolf-howl-voice.js';
 import {
@@ -40,6 +42,7 @@ export function vehicleTargets(state, input) {
   };
 }
 export function createDriveAudio({
+  i18n = createI18n(),
   musicButton,
   effectsButton,
   musicSlider,
@@ -206,13 +209,15 @@ export function createDriveAudio({
     } catch {}
   }
   function paint() {
-    musicButton.textContent = '音乐：' + (prefs.music ? '开' : '关');
-    effectsButton.textContent = '音效：' + (prefs.effects ? '开' : '关');
+    musicButton.textContent = i18n.t(prefs.music ? 'common.musicOn' : 'common.musicOff');
+    effectsButton.textContent = i18n.t(prefs.effects ? 'common.effectsOn' : 'common.effectsOff');
     musicButton.setAttribute('aria-pressed', String(prefs.music));
     effectsButton.setAttribute('aria-pressed', String(prefs.effects));
     musicSlider.value = Math.round(prefs.musicVolume * 100);
     effectsSlider.value = Math.round(prefs.effectsVolume * 100);
-    status.textContent = error || music.snapshot().error || '音乐与音效保持轻声，可分别调节';
+    status.textContent = i18n.format(
+      error || music.snapshot().error || message('common.audioHelp'),
+    );
   }
   function publish() {
     audit.textContent = JSON.stringify({
@@ -334,7 +339,7 @@ export function createDriveAudio({
       brakeGain = null;
       oscillators = [];
       unlocked = false;
-      error = '声音暂不可用，仍可继续驾驶';
+      error = message('common.audioUnavailable');
       console.warn('Audio initialization failed', e);
       paint();
       publish();
@@ -507,6 +512,7 @@ export function createDriveAudio({
     });
   paint();
   publish();
+  i18n.subscribe(paint);
   return {
     preferences: () => ({ ...prefs }),
     dialogue(active) {

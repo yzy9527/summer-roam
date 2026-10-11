@@ -752,8 +752,8 @@ test('manual bell is independent, grips the hanging rope with real bones, and al
   assert.equal(registry.execute(target, 'calf-alarm').ok, true);
   assert.equal(f.heist.snapshot().phase, 'lookout-notice');
   assert.equal(
-    registry.actions(target).find((a) => a.id === 'calf-alarm').reason,
-    '抓牛任务进行中',
+    registry.actions(target).find((a) => a.id === 'calf-alarm').reason.code,
+    'reason.heistActive',
   );
   assert.equal(registry.execute(target, 'ring-bell').ok, false);
   runUntil(f, 'crew-boarding', LOOKOUT_NOTICE_SECONDS + 1);
@@ -766,8 +766,8 @@ test('manual bell is independent, grips the hanging rope with real bones, and al
   assert.equal(f.lookout.snapshot().ringMode, null);
   assert.equal(f.heist.snapshot().manualTask, 'capture');
   assert.equal(
-    registry.actions(target).find((a) => a.id === 'calf-alarm').reason,
-    '抓牛任务进行中',
+    registry.actions(target).find((a) => a.id === 'calf-alarm').reason.code,
+    'reason.heistActive',
   );
 });
 

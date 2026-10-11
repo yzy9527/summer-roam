@@ -1,3 +1,4 @@
+import { message } from './messages.js';
 import { createPaddyWorker } from './gameplay/paddy/worker.js';
 import { createPaddyNavigation } from './gameplay/paddy/navigation.js';
 import { snapshotData, recordPhase } from './app/snapshot-data.js';
@@ -33,26 +34,26 @@ const returning = new Set([
   'storing',
 ]);
 const labels = {
-  idle: '等待小牛入栏',
-  waking: '等待小牛站稳',
-  gathering: '旗手前往看守旁取牛',
-  signal: '旗手正在示意看守开门',
-  opening: '等待看守开门',
-  approaching: '旗手进栏牵牛',
-  hitching: '正在套好牵牛绳',
-  exiting: '正在牵牛出栏',
-  outbound: '正在前往水田',
-  assembling: '正在田边整队',
-  harnessing: '正在安装牛轭与耕索',
-  ploughing: '正在耕田',
-  unhitch: '正在收鞭、抬犁与解索',
-  returning: '正在送牛回栏',
-  'return-open': '等待看守开门接牛',
-  entering: '正在牵牛入栏',
-  release: '正在解开牵牛绳',
-  leaving: '旗手正在退出牛栏',
-  closing: '等待看守关门上锁',
-  storing: '正在放回农具',
+  idle: message('tasks.paddyIdle'),
+  waking: message('tasks.paddyWaking'),
+  gathering: message('tasks.paddyGathering'),
+  signal: message('tasks.paddySignal'),
+  opening: message('tasks.paddyOpening'),
+  approaching: message('tasks.paddyApproaching'),
+  hitching: message('tasks.paddyHitching'),
+  exiting: message('tasks.paddyExiting'),
+  outbound: message('tasks.paddyOutbound'),
+  assembling: message('tasks.paddyAssembling'),
+  harnessing: message('tasks.paddyHarnessing'),
+  ploughing: message('tasks.paddyPloughing'),
+  unhitch: message('tasks.paddyUnhitch'),
+  returning: message('tasks.paddyReturning'),
+  'return-open': message('tasks.paddyReturnOpen'),
+  entering: message('tasks.paddyEntering'),
+  release: message('tasks.paddyRelease'),
+  leaving: message('tasks.paddyLeaving'),
+  closing: message('tasks.paddyClosing'),
+  storing: message('tasks.paddyStoring'),
 };
 
 // The corral lends the original animal until the gate is closed again. Only
@@ -221,12 +222,12 @@ export function createPaddyTask(
     return arrived && distance < 3.1;
   }
   function availability() {
-    if (phase !== 'idle') return '耕田任务正在进行';
+    if (phase !== 'idle') return message('reason.ploughActive');
     const a = animals.animal('hornless-calf');
     return (
       corral.ploughAvailability(a) ||
-      (leader.scripted || leader.seated ? '旗手正忙' : '') ||
-      (worker.scripted || worker.seated ? '扶犁工正忙' : '')
+      (leader.scripted || leader.seated ? message('reason.leaderBusy') : '') ||
+      (worker.scripted || worker.seated ? message('reason.workerBusy') : '')
     );
   }
   function cleanup() {
@@ -307,8 +308,15 @@ export function createPaddyTask(
     },
     status() {
       return phase === 'idle'
-        ? availability() || '小牛已入栏，可以开始耕田'
-        : `${blocked ? '通道受阻，等待通行 · ' : ''}${labels[phase]}${phase === 'ploughing' ? ` · 剩余 ${Math.ceil(remaining)} 秒` : ''}`;
+        ? availability() || message('tasks.ploughReady')
+        : message('tasks.ploughStatus', {
+            blocked: blocked ? message('tasks.blocked') : '',
+            phase: labels[phase],
+            remaining:
+              phase === 'ploughing'
+                ? message('tasks.remaining', { seconds: Math.ceil(remaining) })
+                : '',
+          });
     },
     snapshot() {
       return snapshotData({

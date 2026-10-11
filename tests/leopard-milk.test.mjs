@@ -88,7 +88,7 @@ for (const fps of [30, 60, 120])
     }
     const end = f.milk.snapshot();
     assert.equal(end.phase, 'idle', JSON.stringify(end));
-    assert.equal(end.result, 'fed');
+    assert.equal(end.result, 'fed', JSON.stringify(end));
     assert.equal(end.delivered, 1);
     for (const p of [
       'taking',
@@ -136,7 +136,7 @@ for (const fps of [30, 60, 120])
 
 test('availability/menu deny free calf and other owners; waking and early cancellation return the same pail', async () => {
   const f = await milkFixture();
-  assert.match(f.milk.availability(), /围栏/);
+  assert.equal(f.milk.availability().code, 'reason.confinedCalf');
   assert(!f.milk.start());
   f.confine();
   f.leopard.transportOwner = 'heist';
@@ -148,13 +148,16 @@ test('availability/menu deny free calf and other owners; waking and early cancel
     getTimeOfDay: () => 'day',
   });
   const target = { type: 'animal', animal: f.leopard };
-  assert.equal(actions.actions(target).find((a) => a.id === 'milk').label, '给小牛送奶');
+  assert.equal(actions.actions(target).find((a) => a.id === 'milk').label.code, 'actions.milk');
   f.step(0.05, 'night');
   assert(f.animals.rest(f.leopard.id));
   for (let i = 0; i < 80; i++) f.step(0.05, 'night');
   assert(!f.animals.sleep.ready(f.leopard));
   assert(f.milk.start());
-  assert.equal(actions.actions(target).find((a) => a.id === 'milk').label, '取消送奶');
+  assert.equal(
+    actions.actions(target).find((a) => a.id === 'milk').label.code,
+    'actions.cancelMilk',
+  );
   assert.equal(f.milk.snapshot().phase, 'waking');
   until(f, (s) => s.phase === 'taking');
   assert(f.milk.cancel());

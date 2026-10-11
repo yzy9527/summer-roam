@@ -1,3 +1,4 @@
+import { message } from './messages.js';
 import { claimAnimal, releaseAnimal } from './gameplay/animal-ownership.js';
 import { ANIMAL_PROFILES } from './animal-profiles.js';
 import { familyDriveFeedback, updateFamilyDrive } from './animal-drive.js';
@@ -42,7 +43,7 @@ export function createAnimalInteractions(
       return !!a?.rig && !!a.behavior && !api.owns(a) && a.behavior.state !== 'alert';
     },
     milkAvailability(a) {
-      if (!a?.rig || a.id !== 'baola-leopard') return '豹拉尚未就绪';
+      if (!a?.rig || a.id !== 'baola-leopard') return message('reason.leopardNotReady');
       if (
         a.transportOwner ||
         family.owns(a) ||
@@ -50,9 +51,10 @@ export function createAnimalInteractions(
         encounters.owns(a) ||
         mountain?.owns(a)
       )
-        return '豹拉正在参与其他任务';
-      if (tree?.owns(a) && !tree.interruptible?.(a)) return '请先让豹拉安全下树';
-      if (a.behavior.state === 'alert' || a.behavior.driveTime > 0) return '豹拉正在退让';
+        return message('reason.leopardBusy');
+      if (tree?.owns(a) && !tree.interruptible?.(a)) return message('reason.descendFirst');
+      if (a.behavior.state === 'alert' || a.behavior.driveTime > 0)
+        return message('reason.leopardYielding');
       return '';
     },
     reserveMilk(a) {

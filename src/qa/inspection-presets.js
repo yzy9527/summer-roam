@@ -1,3 +1,5 @@
+import { createI18n } from '../i18n/index.js';
+import { message } from '../messages.js';
 import { MOUNTAIN_SITE, MOUNTAIN_BASE } from '../mountain-profile.js';
 import { culvertLayout } from '../culvert-profile.js';
 import { bridgeLayout } from '../irrigation-style.js';
@@ -11,6 +13,7 @@ import { ZOMBIE_LAYOUT } from '../zombie-layout.js';
 import * as THREE from 'three';
 
 export function createInspectionPresets({
+  i18n = createI18n(),
   views,
   params,
   getPaddyPloughing,
@@ -128,7 +131,14 @@ export function createInspectionPresets({
     if (rescueAudit && rescue) rescueAudit.textContent = JSON.stringify(rescue);
     const rescueReport = document.getElementById('calf-rescue-report');
     if (rescueReport && rescue && !rescueReport.hidden)
-      rescueReport.textContent = `追逐：${rescue.phase} · 公牛：${rescue.bull?.phase ?? 'idle'} · 抓到：${rescue.captures} · 救援：${rescue.rescues} · 顶飞：${rescue.impacts} · 结果：${rescue.outcome || '进行中'}`;
+      rescueReport.textContent = i18n.t('qa.rescueSummary', {
+        chase: rescue.phase,
+        bull: rescue.bull?.phase ?? 'idle',
+        captures: rescue.captures,
+        rescues: rescue.rescues,
+        impacts: rescue.impacts,
+        outcome: rescue.outcome || message('qa.inProgress'),
+      });
     if (params.has('qa') && rescueReport && !rescueReport.hidden && rescue && !views.heist) {
       const p = new THREE.Vector3(...rescue.giant);
       if (rescue.calf)

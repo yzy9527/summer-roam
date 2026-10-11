@@ -1,5 +1,9 @@
+import { createI18n } from './i18n/index.js';
+import { message } from './messages.js';
+import { bindLanguageSettings, readLanguagePreference } from './app/language-settings.js';
 import { connectGameplayAudio } from './app/gameplay-audio.js';
 import { bindGameInput } from './app/input.js';
+import { bindGameHud } from './app/hud.js';
 import { createVehiclePresentation } from './app/vehicle-presentation.js';
 import { createVehicleCamera } from './app/vehicle-camera.js';
 import { createInteractionAudioHooks } from './animal-interactions.js';
@@ -31,7 +35,10 @@ const ui = {
   status: $('drive-status'),
   toast: $('toast'),
 };
+const i18n = createI18n({ initialLocale: readLanguagePreference() });
+const language = bindLanguageSettings({ doc: document, i18n });
 const audio = createDriveAudio({
+  i18n,
   musicButton: $('music-toggle'),
   effectsButton: $('effects-toggle'),
   musicSlider: $('music-volume'),
@@ -71,7 +78,9 @@ let state = spawnState(),
   lastBump = 0;
 const orbit = { yaw: 0, pitch: 0.14, distance: 10 };
 let inputBindings = null,
-  qa = null;
+  qa = null,
+  hud = null,
+  lastDriveStatus = '';
 let sunLight,
   hemiLight,
   dayNight,
@@ -109,13 +118,14 @@ const vehicleCamera = createVehicleCamera({
 const updateCar = vehiclePresentation.update;
 const updateCamera = vehicleCamera.update;
 function clearInput() {
+  hud?.closeLights();
   inputBindings?.menu.close();
   heldKeys.clear();
   for (const k in input) input[k] = false;
   inputBindings?.cancel();
 }
 function toast(text) {
-  ui.toast.textContent = text;
+  language.setText(ui.toast, text);
   ui.toast.classList.add('visible');
   toastUntil = performance.now() + 2800;
 }
@@ -126,11 +136,11 @@ function setMode(next) {
   clearInput();
   ui.intro.classList.toggle('hidden', mode !== 'intro');
   ui.pausePanel.classList.toggle('hidden', mode !== 'paused');
-  ui.dashboard.classList.toggle('hidden', mode === 'intro');
+  ui.dashboard.classList.toggle('hidden', mode !== 'playing');
   ui.pause.disabled = mode === 'intro';
   ui.pause.textContent = mode === 'paused' ? '▷' : 'Ⅱ';
-  ui.pause.setAttribute('aria-label', mode === 'paused' ? '继续游戏' : '暂停游戏');
-  if (mode === 'paused') $('resume').focus();
+  ui.pause.setAttribute('aria-label', i18n.t(mode === 'paused' ? 'common.resume' : 'common.pause'));
+  hud?.modeChanged();
 }
 function reset() {
   qa?.resetView();
@@ -143,7 +153,7 @@ function reset() {
   clearInput();
   updateCar(0);
   updateCamera(0, true);
-  toast('汽车回到了僵尸旁拐角的起点');
+  toast(message('common.resetToast'));
 }
 function resetView() {
   inputBindings?.cancel();
@@ -152,19 +162,27 @@ function resetView() {
   orbit.pitch = 0.14;
   orbit.distance = 10;
   updateCamera(0, true);
-  toast('已恢复车尾跟随视角');
+  toast(message('common.cameraToast'));
 }
 function publishLights() {
   const { mode: lightMode } = lightControl.snapshot();
   vehicleLights?.setMode(lightMode);
-  const label = { off: '关', low: '近光', high: '远光' }[lightMode];
-  $('light-status').textContent = '车灯：' + label;
+  language.setText(
+    $('light-status'),
+    message('common.lightStatus', {
+      beam: message(
+        { off: 'common.lightOff', low: 'common.lightLow', high: 'common.lightHigh' }[lightMode],
+      ),
+    }),
+  );
   $('vehicle-light-controls').dataset.beam = lightMode;
   for (const option of ['off', 'low', 'high'])
     $('light-' + option).setAttribute('aria-pressed', String(option === lightMode));
 }
 function setupInput() {
   inputBindings = bindGameInput({
+    i18n,
+    hud,
     renderer,
     scene,
     camera,
@@ -218,28 +236,39 @@ function animate(time) {
     audio.musicTick(dt);
     qa?.afterDrive(hit, dt);
     const region = regionAt(state.x, state.z);
-    $('region-label').textContent = region + ' · 自由驾驶';
     if (region !== lastRegion) {
       lastRegion = region;
-      toast(region === '日落小镇' ? '日落小镇 · 沿街往海边，可以慢慢停车' : '驶入' + region);
+      toast(
+        region === '日落小镇'
+          ? message('common.townArrival')
+          : message('common.regionArrival', { region: message('common.region') }),
+      );
     }
     if (hit && time - lastBump > 3500) {
-      toast('慢一点，避开水渠和路边障碍');
+      toast(message('common.bumpToast'));
       lastBump = time;
     }
-    ui.speed.textContent = Math.round(Math.abs(state.speed) * 3.6);
-    ui.gear.textContent = state.speed > 0.2 ? 'D' : state.speed < -0.2 ? 'R' : 'N';
-    ui.status.textContent = input.brake
-      ? '正在刹车'
+    const speed = String(Math.round(Math.abs(state.speed) * 3.6));
+    const gear = state.speed > 0.2 ? 'D' : state.speed < -0.2 ? 'R' : 'N';
+    if (ui.speed.textContent !== speed) ui.speed.textContent = speed;
+    if (ui.gear.textContent !== gear) ui.gear.textContent = gear;
+    const status = input.brake
+      ? 'common.braking'
       : state.drift?.active
-        ? '漂移中 · 松开 Shift 收回'
+        ? 'common.drifting'
         : (state.drift?.amount ?? 0) > 0.1
-          ? '恢复抓地中'
+          ? 'common.grip'
           : state.surface === '公路'
-            ? regionAt(state.x, state.z)
+            ? region === '日落小镇'
+              ? 'common.town'
+              : 'common.region'
             : state.surface === '沙滩'
-              ? '沙滩漫游'
-              : '草地漫游';
+              ? 'common.beach'
+              : 'common.grass';
+    if (status !== lastDriveStatus) {
+      lastDriveStatus = status;
+      language.setText(ui.status, message(status));
+    }
   }
   updateCar(dt);
   updateCamera(dt);
@@ -254,7 +283,7 @@ function animate(time) {
     focusState(),
     Math.atan2(audioFacing.x, audioFacing.z),
   );
-  $('compass-arrow').style.transform = `rotate(${focusState().heading}rad)`;
+  if (hud.showCompass) $('compass-arrow').style.transform = `rotate(${focusState().heading}rad)`;
   if (time > toastUntil) ui.toast.classList.remove('visible');
   updateAtmosphere();
   field?.update({
@@ -284,7 +313,7 @@ function fail(error) {
   $('error-panel').classList.remove('hidden');
   ui.intro.classList.add('hidden');
   ui.dashboard.classList.add('hidden');
-  $('error-message').textContent = '请确认浏览器支持 WebGL 并开启硬件加速，然后刷新页面重试。';
+  language.setText($('error-message'), message('common.errorWebGL'));
 }
 const observer = createFieldObserver({
   readGame: () => ({
@@ -310,10 +339,29 @@ const observer = createFieldObserver({
   getImpact: () => bullImpact,
 });
 const qaParams = new URLSearchParams(location.search);
+hud = bindGameHud({
+  doc: document,
+  i18n,
+  getMode: () => mode,
+  setMode,
+  getTimeOfDay: () => dayNight?.snapshot().mode ?? 'day',
+  onResume: () => {
+    void audio.unlock();
+    void explorationAudio.unlock();
+  },
+});
+language.setText(ui.start, message('common.loading'));
+language.setText(ui.status, message('common.departing'));
+publishLights();
+i18n.subscribe(() => {
+  ui.pause.setAttribute('aria-label', i18n.t(mode === 'paused' ? 'common.resume' : 'common.pause'));
+  field?.refreshSigns();
+});
 try {
   if (qaParams.has('qa')) {
     const { createFieldQA } = await import('./field-qa.js');
     qa = createFieldQA({
+      i18n,
       params: qaParams,
       getState: () => state,
       getAnimals: () => field?.animals,
@@ -401,6 +449,7 @@ try {
     .catch((error) => ({ error }));
   field = await buildField(scene, renderer, colliders, {
     progressive: true,
+    signText: (key) => i18n.t(key),
     getPlayer: () => state,
   });
   updateCamera(0, true);
@@ -412,20 +461,17 @@ try {
     sky: field.sky,
     reducedMotion,
   });
-  for (const timeOfDay of ['day', 'night']) {
-    const button = $('time-' + timeOfDay);
-    button.disabled = false;
-    button.addEventListener('click', () => {
-      dayNight.setMode(timeOfDay);
-      audio.setTimeOfDay(timeOfDay);
-      lightControl.setTimeOfDay(timeOfDay);
-      publishLights();
-      $('game').dataset.timeOfDay = timeOfDay;
-      for (const option of ['day', 'night'])
-        $('time-' + option).setAttribute('aria-pressed', String(option === timeOfDay));
-      toast(timeOfDay === 'night' ? '黑夜 · 抬头看看星星' : '白天 · 继续看夏日田野');
-    });
-  }
+  $('time-toggle').disabled = false;
+  $('time-toggle').addEventListener('click', () => {
+    const timeOfDay = dayNight.snapshot().mode === 'day' ? 'night' : 'day';
+    dayNight.setMode(timeOfDay);
+    audio.setTimeOfDay(timeOfDay);
+    lightControl.setTimeOfDay(timeOfDay);
+    publishLights();
+    $('game').dataset.timeOfDay = timeOfDay;
+    hud.refreshTime();
+    toast(timeOfDay === 'night' ? message('common.nightToast') : message('common.dayToast'));
+  });
   try {
     const result = await vehicleReady;
     if (result.error) throw result.error;
@@ -451,7 +497,7 @@ try {
 
   observer.start();
   ui.start.disabled = false;
-  ui.start.textContent = '出发，一起看夏天';
+  language.setText(ui.start, message('common.start'));
   window.__seaside = {
     snapshot: observer.snapshot,
     explorationSnapshot: () => ({
@@ -462,9 +508,7 @@ try {
     }),
   };
   performance.mark('drive-ready');
-  toast(
-    field.warnings.length ? '部分景物未加载，请刷新重试。' : '可以出发了，田野里的动物正在赶来。',
-  );
+  toast(field.warnings.length ? message('common.partialScenery') : message('common.driveReady'));
   void field
     .loadBackground()
     .then(() => {
@@ -478,12 +522,12 @@ try {
       });
       performance.mark('world-ready');
       qa?.mount();
-      if (field.warnings.length) toast('部分景物未加载，请刷新重试。');
+      if (field.warnings.length) toast(message('common.partialScenery'));
     })
     .catch((error) => {
       field.loading.actors = 'failed';
       console.error('Background characters failed to initialize', error);
-      toast('部分角色未加载，请刷新重试。');
+      toast(message('common.partialActors'));
     });
 } catch (error) {
   fail(error);

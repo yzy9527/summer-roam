@@ -1,3 +1,4 @@
+import { message } from './messages.js';
 import { assetUrl } from './asset-url.js';
 
 export const MUSIC_URL = assetUrl('music');
@@ -69,7 +70,7 @@ export function createBackgroundMusic(media, publish = () => {}) {
         .catch((error) => {
           if (request !== track.request) return;
           track.pending = false;
-          track.error = error.name === 'AbortError' ? '' : '点击音乐按钮即可恢复播放';
+          track.error = error.name === 'AbortError' ? '' : message('common.musicResume');
           track.started = false;
           gains();
           publish();
@@ -93,7 +94,7 @@ export function createBackgroundMusic(media, publish = () => {}) {
       publish();
     });
     track.audio.addEventListener('error', () => {
-      track.error = '音乐暂未加载，仍可继续驾驶';
+      track.error = message('common.musicUnavailable');
       pause(track);
       gains();
       publish();

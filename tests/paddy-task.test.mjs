@@ -144,7 +144,7 @@ test('captured original calf completes timed ploughing and returns through the r
   assert.equal(PLOUGH_SECONDS, 300);
   assert(!menu.actions({ type: 'actor', id: 'pvz-flagbearer' }).some((a) => /plough/.test(a.id)));
   assert.equal(f.scene.getObjectByName('水田耕牛'), undefined);
-  assert.match(menu.actions(target)[0].reason, /抓回/);
+  assert.equal(menu.actions(target)[0].reason.code, 'reason.captureFirst');
   assert.equal(task.start(), false);
   f.confine();
   assert.equal(menu.execute(target, 'start-plough').ok, true);

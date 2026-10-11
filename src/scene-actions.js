@@ -1,9 +1,10 @@
+import { message } from './messages.js';
 const ANIMAL_NAMES = {
-  'golden-cow': '母牛',
-  'copper-cow': '公牛',
-  'hornless-calf': '小牛',
-  'reference-wolf': '狼',
-  'baola-leopard': '豹拉',
+  'golden-cow': message('actions.mother'),
+  'copper-cow': message('actions.bull'),
+  'hornless-calf': message('actions.calf'),
+  'reference-wolf': message('actions.wolf'),
+  'baola-leopard': message('actions.leopard'),
 };
 
 function visible(node) {
@@ -23,7 +24,7 @@ export function pickActionTarget(scene, ray, field, car) {
     }
   });
   const hit = ray.intersectObjects(scene.children, true).find((h) => visible(h.object));
-  if (!hit) return { type: 'world', name: '田野动作' };
+  if (!hit) return { type: 'world', name: message('actions.field') };
   const animals = Object.keys(ANIMAL_NAMES)
     .map((id) => field?.animals?.animal(id))
     .filter(Boolean);
@@ -32,20 +33,20 @@ export function pickActionTarget(scene, ray, field, car) {
     const animal = [...confined, ...animals].find((a) => a.group === n);
     if (animal)
       return { type: 'animal', animal, name: ANIMAL_NAMES[animal.id], point: hit.point.clone() };
-    if (n === field?.corral?.model.gate) return { type: 'gate', name: '围栏门' };
+    if (n === field?.corral?.model.gate) return { type: 'gate', name: message('actions.gate') };
     for (const [id, name] of [
-      ['pvz-flagbearer', '旗手僵尸'],
-      ['pvz-ploughman', '扶犁僵尸'],
-      ['pvz-gargantuar', '大僵尸'],
-      ['pvz-conehead', '路锥僵尸'],
-      ['pvz-gatekeeper', '围栏看守'],
-      ['pvz-lookout', '塔台瞭望员'],
+      ['pvz-flagbearer', message('actions.flagbearer')],
+      ['pvz-ploughman', message('actions.ploughman')],
+      ['pvz-gargantuar', message('actions.giant')],
+      ['pvz-conehead', message('actions.conehead')],
+      ['pvz-gatekeeper', message('actions.gatekeeper')],
+      ['pvz-lookout', message('actions.lookout')],
     ])
       if (n === field?.zombies?.actor(id)?.object) return { type: 'actor', id, name };
-    if (n === field?.woodenCart?.root) return { type: 'cart', name: '抓牛木车' };
-    if (n === car) return { type: 'vehicle', name: '小车' };
+    if (n === field?.woodenCart?.root) return { type: 'cart', name: message('actions.cart') };
+    if (n === car) return { type: 'vehicle', name: message('actions.car') };
   }
-  return { type: 'world', name: '田野动作' };
+  return { type: 'world', name: message('actions.field') };
 }
 
 export function createSceneActions({
@@ -61,7 +62,7 @@ export function createSceneActions({
   function actions(target) {
     const field = getField(),
       result = [];
-    const add = (id, label, run, reason = '', group = '当前对象', detail = '') =>
+    const add = (id, label, run, reason = '', group = message('actions.current'), detail = '') =>
       result.push({ id, label, run, reason, group, detail });
     if (!field) return [];
     const a = target?.animal,
@@ -76,7 +77,7 @@ export function createSceneActions({
         a.mode === 'recapture-held' || ['plough', 'milk-visit'].includes(a.transportOwner);
       add(
         'tap',
-        a.id === 'reference-wolf' ? '触摸互动' : '拍一拍',
+        a.id === 'reference-wolf' ? message('actions.touch') : message('actions.tap'),
         () => {
           if (corral?.animals.includes(a)) {
             corral.touch(a, target.point);
@@ -87,30 +88,30 @@ export function createSceneActions({
         confined
           ? held
             ? a.transportOwner === 'milk-visit'
-              ? '小牛正在喝牛奶'
+              ? message('reason.drinking')
               : a.transportOwner === 'plough'
-                ? '正在执行耕田任务'
-                : '正在被抱着'
+                ? message('reason.ploughing')
+                : message('reason.held')
             : ''
           : unavailable('tap'),
-        '当前对象',
-        a.id === 'reference-wolf' ? '触摸后可能上山或追赶小牛' : '拍击会累计，可能触发动物互动',
+        message('actions.current'),
+        a.id === 'reference-wolf' ? message('actions.touchDetail') : message('actions.tapDetail'),
       );
       add(
         'call',
-        a.id === 'reference-wolf' ? '嚎叫一声' : '叫一声',
+        a.id === 'reference-wolf' ? message('actions.howl') : message('actions.call'),
         () => animalCall({ id: a.id, instanceId: a.instanceId ?? a.id, x: a.x, z: a.z }),
         confined
           ? held
             ? a.transportOwner === 'milk-visit'
-              ? '小牛正在喝牛奶'
+              ? message('reason.drinking')
               : a.transportOwner === 'plough'
-                ? '正在执行耕田任务'
-                : '正在被抱着'
+                ? message('reason.ploughing')
+                : message('reason.held')
             : ''
           : unavailable('call'),
-        '当前对象',
-        '只播放叫声，不触发拍击或追赶',
+        message('actions.current'),
+        message('actions.callDetail'),
       );
       if (a.id === 'baola-leopard' && field.leopardMilk) {
         const milk = field.leopardMilk,
@@ -118,37 +119,39 @@ export function createSceneActions({
         const active = state.phase !== 'idle';
         add(
           'milk',
-          active ? '取消送奶' : '给小牛送奶',
+          active ? message('actions.cancelMilk') : message('actions.milk'),
           () => (active ? milk.cancel() : milk.start(getCar())),
-          active ? (state.cancelled ? '正在带奶桶安全返回' : '') : milk.availability(),
-          '当前对象',
-          '叼奶桶跃过围栏，喂完小牛后带空桶回来',
+          active ? (state.cancelled ? message('reason.safeMilkReturn') : '') : milk.availability(),
+          message('actions.current'),
+          message('actions.milkDetail'),
         );
       }
       if (!confined && !a.transportOwner) {
         add(
           'graze',
-          ['reference-wolf', 'baola-leopard'].includes(a.id) ? '低头嗅地' : '吃草',
+          ['reference-wolf', 'baola-leopard'].includes(a.id)
+            ? message('actions.sniff')
+            : message('actions.graze'),
           () => meadow.graze(a.id),
           unavailable('graze'),
         );
-        add('turn', '转身走动', () => meadow.turn(a.id), unavailable('turn'));
+        add('turn', message('actions.turn'), () => meadow.turn(a.id), unavailable('turn'));
         const asleep = !meadow.sleep.ready(a);
         add(
           asleep ? 'wake' : 'rest',
-          asleep ? '起身' : '趴下休息',
+          asleep ? message('actions.wake') : message('actions.rest'),
           () => (asleep ? meadow.wake(a.id) : meadow.rest(a.id)),
           asleep
             ? unavailable('wake')
             : getTimeOfDay() !== 'night'
-              ? '夜间才能休息'
+              ? message('reason.nightOnly')
               : unavailable('rest'),
         );
         if (a.id === 'reference-wolf') {
           const descent = meadow.mountain?.snapshot().phase === 'summit';
           add(
             'mountain',
-            descent ? '下山' : '登山',
+            descent ? message('actions.descendMountain') : message('actions.climbMountain'),
             () => (descent ? meadow.mountain.requestDescent() : meadow.mountain?.start(getCar())),
             descent ? '' : unavailable('mountain'),
           );
@@ -159,7 +162,7 @@ export function createSceneActions({
           );
           add(
             'tree',
-            descent ? '下树' : '上树',
+            descent ? message('actions.descendTree') : message('actions.climbTree'),
             () => (descent ? meadow.tree.requestDescent() : meadow.tree?.start(getCar())),
             descent ? '' : unavailable('tree'),
           );
@@ -170,15 +173,15 @@ export function createSceneActions({
       const gate = corral.snapshot();
       add(
         'open-gate',
-        '打开围栏门',
+        message('actions.openGate'),
         () => corral.setManualGateOpen(true),
-        gate.controlled ? '正在运输入栏' : '',
+        gate.controlled ? message('reason.delivering') : '',
       );
       add(
         'close-gate',
-        '关闭围栏门',
+        message('actions.closeGate'),
         () => corral.setManualGateOpen(false),
-        gate.controlled ? '正在运输入栏' : '',
+        gate.controlled ? message('reason.delivering') : '',
       );
     }
     if (target?.id === 'pvz-ploughman') {
@@ -187,38 +190,40 @@ export function createSceneActions({
       if (!state?.active)
         add(
           'start-plough',
-          '开始耕田',
+          message('actions.startPlough'),
           () => task.start(),
-          task?.availability() ?? '耕田队伍尚未就绪',
+          task?.availability() ?? message('reason.ploughNotReady'),
         );
       else
         add(
           'stop-plough',
-          state.phase === 'ploughing' ? '结束耕田' : '取消耕田',
+          state.phase === 'ploughing'
+            ? message('actions.endPlough')
+            : message('actions.cancelPlough'),
           () => task.stop(),
-          state.canStop ? '' : '正在送牛回栏并收好农具',
+          state.canStop ? '' : message('reason.ploughReturning'),
         );
     }
     if (target?.id === 'pvz-gatekeeper')
-      add('guard-close', '请看守关门', () => corral?.requestGuardClose());
+      add('guard-close', message('actions.guardClose'), () => corral?.requestGuardClose());
     if (target?.id === 'pvz-lookout') {
       const lookout = field.lookout,
         heist = field.calfHeist;
       add(
         'ring-bell',
-        '摇铃铛',
+        message('actions.ring'),
         () => lookout.ring(),
-        lookout && heist ? lookout.ringAvailability() : '瞭望员尚未就绪',
-        '当前对象',
-        '摇响塔台铃铛',
+        lookout && heist ? lookout.ringAvailability() : message('reason.lookoutNotReady'),
+        message('actions.current'),
+        message('actions.ringDetail'),
       );
       add(
         'calf-alarm',
-        '小牛离群警报',
+        message('actions.alarm'),
         () => heist.alertManual(),
-        heist ? heist.alarmAvailability() : '抓牛角色尚未就绪',
-        '当前对象',
-        '摇铃通知车组抓捕小牛',
+        heist ? heist.alarmAvailability() : message('reason.heistNotReady'),
+        message('actions.current'),
+        message('actions.alarmDetail'),
       );
     }
     const giant = target?.id === 'pvz-gargantuar',
@@ -229,49 +234,51 @@ export function createSceneActions({
         calf = meadow?.animal('hornless-calf');
       const hs = h?.snapshot(),
         rs = r?.snapshot();
-      const reason = h ? h.manualAvailability(calf) : '抓牛角色尚未就绪';
-      const group = '小牛任务';
+      const reason = h ? h.manualAvailability(calf) : message('reason.heistNotReady');
+      const group = message('actions.calfGroup');
       if (giant) {
         add(
           'hold-calf',
-          '抱起小牛',
+          message('actions.hold'),
           () => h.holdManual(calf),
           reason,
           group,
-          '大僵尸走近、抱起后停留',
+          message('actions.holdDetail'),
         );
         add(
           'put-down',
-          '放下小牛',
+          message('actions.lower'),
           () => h.putDownManual(),
-          hs?.phase === 'manual-hold' ? '' : '先让大僵尸抱起小牛',
+          hs?.phase === 'manual-hold' ? '' : message('reason.holdFirst'),
           group,
         );
       }
       if (cart)
         add(
           'capture-calf',
-          '出车抓牛',
+          message('actions.capture'),
           () => h.startManual(calf),
           reason,
           group,
-          '抓牛车组出发，将小牛运回围栏',
+          message('actions.captureDetail'),
         );
       if (giant) {
         add(
           'recapture-calf',
-          '追回逃跑小牛',
+          message('actions.recapture'),
           () => r.startManual(calf),
-          r ? r.manualAvailability(calf) : '追回角色尚未就绪',
+          r ? r.manualAvailability(calf) : message('reason.rescueNotReady'),
           group,
-          '徒步追赶，仍可能被公牛打断',
+          message('actions.recaptureDetail'),
         );
         const mode = hs?.carryMode === 'underarm' ? 'two-hand' : 'underarm';
         add(
           'carry-mode',
-          mode === 'two-hand' ? '抱法：切换双手托抱' : '抱法：切换单臂抱',
+          mode === 'two-hand' ? message('actions.twoHand') : message('actions.underarm'),
           () => h.setCarryMode(mode),
-          h && hs.phase === 'waiting' && !reason.includes('大僵尸') ? '' : '任务开始前才能切换抱法',
+          h && hs.phase === 'waiting' && reason?.code !== 'reason.giantBusy'
+            ? ''
+            : message('reason.carryBeforeTask'),
           group,
         );
       }
@@ -281,31 +288,31 @@ export function createSceneActions({
       )
         add(
           'cancel-heist',
-          '取消当前抓牛任务',
+          message('actions.cancelHeist'),
           () => h.cancelManual(),
           hs.manualCancel || hs.trigger.aborting || hs.trigger.abortRequested
-            ? '正在安全结束任务'
+            ? message('reason.finishing')
             : hs.manualTask === 'capture' && (hs.carrying || field.woodenCart?.cargo)
-              ? '已装运，完成入栏后结束'
+              ? message('reason.cargoLoaded')
               : '',
           group,
         );
       if (giant && rs?.manual)
         add(
           'cancel-rescue',
-          '取消追回任务',
+          message('actions.cancelRescue'),
           () => r.cancelManual(),
           ['dropping', 'fleeing', 'airborne', 'landed', 'leaving'].includes(rs.phase)
-            ? '正在安全结束任务'
+            ? message('reason.finishing')
             : '',
           group,
         );
     }
     if (target?.type === 'vehicle') {
-      const group = '小车与镜头';
+      const group = message('actions.carGroup');
       add(
         'camera',
-        '恢复车尾视角',
+        message('actions.camera'),
         () => {
           resetView();
           return true;
@@ -314,9 +321,9 @@ export function createSceneActions({
         group,
       );
       for (const [id, label] of [
-        ['off', '关闭车灯'],
-        ['low', '近光灯'],
-        ['high', '远光灯'],
+        ['off', message('actions.lightOff')],
+        ['low', message('actions.lightLow')],
+        ['high', message('actions.lightHigh')],
       ])
         add(
           'light-' + id,
@@ -330,7 +337,7 @@ export function createSceneActions({
         );
       add(
         'reset-car',
-        '小车回到起点',
+        message('actions.resetCar'),
         () => {
           resetCar();
           return true;
@@ -349,7 +356,11 @@ export function createSceneActions({
         return getField()?.paddyPloughing?.status() ?? '';
       if (target?.id === 'pvz-lookout') {
         const mode = getField()?.lookout?.snapshot().ringMode;
-        return mode === 'notice' ? '正在摇铃通知抓牛车组' : mode ? '正在摇铃' : '';
+        return mode === 'notice'
+          ? message('tasks.ringCrew')
+          : mode
+            ? message('reason.ringing')
+            : '';
       }
       if (target?.type !== 'cart' && target?.id !== 'pvz-gargantuar') return '';
       const field = getField(),
@@ -357,28 +368,30 @@ export function createSceneActions({
         r = field?.calfRescue?.snapshot();
       if (h?.manualTask) {
         if (h.manualCancel || h.trigger.aborting || h.trigger.abortRequested)
-          return '正在安全结束抓牛任务';
+          return message('tasks.finishingCapture');
         const phases = {
-          'manual-approach': '大僵尸正在走向小牛',
-          'seek-calf': '正在寻找安全抱牛位置',
-          'face-calf': '正在转身靠近小牛',
-          'crouch-and-grip': '正在蹲下托住小牛',
-          'lift-calf': '正在抱起小牛',
-          'manual-hold': '已抱起，可选择放下小牛',
-          'manual-lower': '正在安全放下小牛',
-          'manual-release': '正在松手起身',
-          'manual-leave': '正在退开，释放小牛',
-          'lookout-notice': '瞭望员正在通知抓牛车组',
-          'crew-boarding': '驾驶员和大僵尸正在一同上车',
+          'manual-approach': message('tasks.approachCalf'),
+          'seek-calf': message('tasks.seekCalf'),
+          'face-calf': message('tasks.faceCalf'),
+          'crouch-and-grip': message('tasks.grip'),
+          'lift-calf': message('tasks.lift'),
+          'manual-hold': message('tasks.hold'),
+          'manual-lower': message('tasks.lower'),
+          'manual-release': message('tasks.release'),
+          'manual-leave': message('tasks.leaveCalf'),
+          'lookout-notice': message('tasks.lookoutNotice'),
+          'crew-boarding': message('tasks.crewBoarding'),
         };
-        return phases[h.phase] ?? (h.carrying ? '正在搬运小牛' : '抓牛车组正在执行运牛流程');
+        return (
+          phases[h.phase] ?? (h.carrying ? message('tasks.carry') : message('tasks.transport'))
+        );
       }
-      if (r?.manual) return r.carrying ? '大僵尸正在抱牛返回围栏' : '大僵尸正在执行追回任务';
+      if (r?.manual) return r.carrying ? message('tasks.rescueCarry') : message('tasks.rescue');
       return '';
     },
     execute(target, id) {
       const action = actions(target).find((a) => a.id === id);
-      if (!action) return { ok: false, message: '目标已不可用，请重新选择' };
+      if (!action) return { ok: false, message: message('actions.unavailable') };
       if (action.reason) return { ok: false, message: action.reason };
       const ok = !!action.run();
       const started = [
@@ -397,10 +410,10 @@ export function createSceneActions({
       return {
         ok,
         message: ok
-          ? action.label + (started ? '：已开始' : '：已执行')
+          ? message(started ? 'actions.started' : 'actions.executed', { action: action.label })
           : id === 'call'
-            ? '当前无法叫声：请检查音效开关、距离，或等待其他声音结束 / 叫声冷却'
-            : '当前无法执行，请检查通道、落点或角色状态',
+            ? message('actions.callFailed')
+            : message('actions.failed'),
       };
     },
   };

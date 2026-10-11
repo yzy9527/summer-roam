@@ -1,8 +1,11 @@
+import { message } from '../messages.js';
 import * as THREE from 'three';
 import { bindCameraPointer } from '../camera-pointer.js';
 import { createActionMenu } from '../action-menu.js';
 import { createSceneActions, pickActionTarget } from '../scene-actions.js';
 export function bindGameInput({
+  i18n,
+  hud,
   renderer,
   scene,
   camera,
@@ -46,10 +49,11 @@ export function bindGameInput({
   });
   actionMenu = createActionMenu({
     host: $('game'),
+    i18n,
     actions: sceneActions.actions,
     status: sceneActions.status,
     execute: (target, id) => {
-      if (getMode() !== 'playing') return { ok: false, message: '请先继续游戏' };
+      if (getMode() !== 'playing') return { ok: false, message: message('reason.resume') };
       void audio.unlock();
       return sceneActions.execute(target, id);
     },
@@ -82,7 +86,9 @@ export function bindGameInput({
   const showActions = (event) => {
     const field = getField();
     if (!field) return;
-    actionMenu.show(pickActionTarget(scene, pointerRay(event), field, getCar()), event);
+    const target = pickActionTarget(scene, pointerRay(event), field, getCar());
+    actionMenu.show(target, event);
+    if (actionMenu.open) hud.activity('actions');
   };
   const keys = {
     KeyW: 'forward',
@@ -103,6 +109,13 @@ export function bindGameInput({
     for (const key of held) if (keys[key]) input[keys[key]] = true;
   };
   addEventListener('keydown', (e) => {
+    // Let focused controls keep native Space/Enter activation, rather than
+    // treating the same key as a driving command behind the interface.
+    if (
+      ['Space', 'Enter', 'NumpadEnter'].includes(e.code) &&
+      e.target.matches?.('button, a, [role="tab"]')
+    )
+      return;
     if (
       e.target.matches?.('input, textarea, select, [contenteditable="true"]') &&
       e.code !== 'Escape'
@@ -117,7 +130,8 @@ export function bindGameInput({
     }
     if (e.code === 'Escape' && getMode() !== 'intro') {
       held.clear();
-      setMode(getMode() === 'paused' ? 'playing' : 'paused');
+      if (getMode() === 'paused') hud.resume();
+      else setMode('paused');
       return;
     }
     if (getMode() !== 'playing') return;
@@ -140,11 +154,12 @@ export function bindGameInput({
       publishLights();
     }
     if (e.code === 'KeyH') {
-      if (!lightControl.toggleBeam()) toast('按 L 打开车灯');
+      if (!lightControl.toggleBeam()) toast(message('common.lightFirst'));
       publishLights();
     }
   });
   addEventListener('keyup', (e) => {
+    if (held.has(e.code)) hud.activity('drive');
     held.delete(e.code);
     refresh();
   });
@@ -166,6 +181,7 @@ export function bindGameInput({
       drag = next;
     },
     rotateOrbit(dx, dy) {
+      hud.activity('camera');
       const targetOrbit = orbit;
       targetOrbit.yaw -= dx * 0.006;
       targetOrbit.pitch = THREE.MathUtils.clamp(targetOrbit.pitch + dy * 0.004, 0.13, 0.95);
@@ -176,6 +192,7 @@ export function bindGameInput({
     'wheel',
     (e) => {
       if (getMode() !== 'playing' || actionMenu.open) return;
+      hud.activity('camera');
       e.preventDefault();
       if (getQA()?.inspectionCamera.zoom(e.deltaY)) return;
       const targetOrbit = orbit;
@@ -188,17 +205,6 @@ export function bindGameInput({
     { passive: false },
   );
   ui.start.addEventListener('click', () => {
-    void audio.unlock();
-    void explorationAudio.unlock();
-    held.clear();
-    setMode('playing');
-    toast('左键 / E 选动作 · 数字键选择 · 右键拖动转镜头');
-  });
-  ui.pause.addEventListener('click', () => {
-    held.clear();
-    setMode(getMode() === 'paused' ? 'playing' : 'paused');
-  });
-  $('resume').addEventListener('click', () => {
     void audio.unlock();
     void explorationAudio.unlock();
     held.clear();

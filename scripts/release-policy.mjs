@@ -43,5 +43,9 @@ export const RELEASE_BUDGET = Object.freeze({
   // and inspection add about 20 KiB to 1078.4 KiB; binary/file caps stay unchanged.
   // Approved ground-return interruption, continuous milk routes and supplied
   // media-driven dialogue measure 1103.8 KiB; retain the binary/file caps.
-  codeBytes: 1104 * 1024,
+  // Approved Chinese/English interface, data packs, live bindings and localized
+  // QA measure 1142.3 KiB (+38.5 KiB); retain the binary/file caps.
+  // Approved quiet HUD, event-driven hints, help/settings tabs and bilingual
+  // controls measure 1152.9 KiB (+10.5 KiB); retain binary/file caps.
+  codeBytes: 1153 * 1024,
 });

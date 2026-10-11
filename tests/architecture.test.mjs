@@ -120,3 +120,35 @@ test('1317 spatial samples and 2640 drive steps exactly preserve phase-one numer
   );
   assert.deepEqual(probeWorld(legacyWorld, culvert), baseline);
 });
+
+test('language formatting and data stay isolated from gameplay and application state', () => {
+  const { graph, external } = graphFromEntries();
+  const controllers = new Set([
+    'animal-interactions.js',
+    'field-animals.js',
+    'paddy-task.js',
+    'zombie-calf-heist.js',
+    'zombie-calf-rescue.js',
+    'zombie-corral.js',
+    'zombie-lookout.js',
+    'scene-actions.js',
+  ]);
+  for (const [file, dependencies] of graph) {
+    const name = relative(root, file);
+    if (name.startsWith('gameplay/') || controllers.has(name))
+      for (const dependency of dependencies)
+        assert.ok(!relative(root, dependency).startsWith('i18n/'), `${name} reads language state`);
+    if (!name.startsWith('i18n/')) continue;
+    assert.deepEqual(external.get(file), [], `${name} imports a framework`);
+    assert.doesNotMatch(readFileSync(file, 'utf8'), /\b(?:document|window|localStorage|THREE)\b/);
+    for (const dependency of dependencies) {
+      const target = relative(root, dependency);
+      assert.ok(target.startsWith('i18n/'), `${name} depends on application: ${target}`);
+      if (name.startsWith('i18n/locales/'))
+        assert.ok(target.startsWith('i18n/locales/'), `${name} imports engine code`);
+      if (name === 'i18n/registry.js')
+        assert.ok(target.startsWith('i18n/locales/'), `Registry imports ${target}`);
+    }
+  }
+  assert.deepEqual(graph.get(resolve(root, 'i18n/core.js')), []);
+});

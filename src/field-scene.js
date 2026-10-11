@@ -1,4 +1,5 @@
 import { createLeopardMilkVisit } from './gameplay/milk/visit.js';
+import chineseMessages from './i18n/locales/zh-CN/common.js';
 import { createGameplayTick } from './gameplay/tick.js';
 import { addLeopardTree } from './leopard-tree-site.js';
 import { assetUrl } from './asset-url.js';
@@ -458,7 +459,7 @@ export async function buildField(
   scene,
   renderer,
   colliders,
-  { progressive = false, getPlayer } = {},
+  { progressive = false, getPlayer, signText = (key) => chineseMessages[key] } = {},
 ) {
   const cull = [],
     warnings = [],
@@ -770,6 +771,7 @@ export async function buildField(
     console.warn('Anime forest unavailable; forest visuals omitted.', error);
   }
   await addEnvironmentSample(scene, colliders, warnings);
+  const signPainters = [];
   // Keep the roadside marker at the far-end turn-around area.
   for (const [x, z] of [[-33, 204]]) {
     add(
@@ -784,16 +786,21 @@ export async function buildField(
     canvas.width = 256;
     canvas.height = 128;
     const c = canvas.getContext('2d');
-    c.fillStyle = '#e9e6cf';
-    c.fillRect(0, 0, 256, 128);
-    c.fillStyle = '#526b5d';
-    c.font = 'bold 36px sans-serif';
-    c.textAlign = 'center';
-    c.fillText('田野 · 慢行', 128, 58);
-    c.font = '24px sans-serif';
-    c.fillText(z > 100 ? '左拐 · 环田公路' : '环田公路 · 慢行', 128, 99);
     const map = new THREE.CanvasTexture(canvas);
     map.colorSpace = THREE.SRGBColorSpace;
+    const paintSign = () => {
+      c.fillStyle = '#e9e6cf';
+      c.fillRect(0, 0, 256, 128);
+      c.fillStyle = '#526b5d';
+      c.font = 'bold 30px sans-serif';
+      c.textAlign = 'center';
+      c.fillText(signText('common.signSlow'), 128, 58, 240);
+      c.font = '22px sans-serif';
+      c.fillText(signText(z > 100 ? 'common.signTurn' : 'common.signLoop'), 128, 99, 240);
+      map.needsUpdate = true;
+    };
+    paintSign();
+    signPainters.push(paintSign);
     add(
       scene,
       new THREE.PlaneGeometry(1.6, 0.8),
@@ -919,6 +926,7 @@ export async function buildField(
     });
   let tick = makeTick();
   const field = {
+    refreshSigns: () => signPainters.forEach((paint) => paint()),
     loading,
     loadBackground,
     warnings,

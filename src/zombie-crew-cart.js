@@ -61,7 +61,7 @@ export const CREW_PARKING_ALIGN = Object.freeze({
 
 export function createCrewCart(asset, zombies, colliders, ground = drivingHeight) {
   const root = new THREE.Group();
-  root.name = '路锥驾驶的大僵尸与小牛木车';
+  root.name = '路锥驾驶的巨人僵尸与小牛木车';
   asset.traverse((mesh) => {
     if (mesh.isMesh) mesh.castShadow = mesh.receiveShadow = true;
   });

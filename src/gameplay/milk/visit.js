@@ -1,3 +1,4 @@
+import { message } from '../../messages.js';
 import * as THREE from 'three';
 import { CORRAL } from '../../corral-model.js';
 import { dryAnimalPoint } from '../../corral-navigation.js';
@@ -297,8 +298,8 @@ export function createLeopardMilkVisit(
       sound = fn ?? (() => false);
     },
     availability() {
-      if (phase !== 'idle') return '豹拉正在送奶或返回';
-      if (cooldown > 0) return `牛奶补充中，还需${Math.ceil(cooldown)}秒`;
+      if (phase !== 'idle') return message('reason.milkActive');
+      if (cooldown > 0) return message('reason.milkRefill', { seconds: Math.ceil(cooldown) });
       const reason = animals.interactions.milkAvailability(leopard);
       if (reason) return reason;
       const target = corral.animals.find((a) => a.id === 'hornless-calf');
@@ -328,14 +329,16 @@ export function createLeopardMilkVisit(
     },
     status() {
       if (phase === 'idle')
-        return cooldown > 0 ? `牛奶补充中：${Math.ceil(cooldown)}秒` : '牛奶已备好';
-      if (cancelled) return '正在带奶桶安全返回';
-      if (phase === 'feeding') return '小牛正在喝牛奶';
-      if (phase === 'question') return '小牛：还有吗？';
-      if (phase === 'answer') return '豹拉：满足你的胃，它会治愈悲伤的';
-      if (/windup|jumping|landing/.test(phase)) return '豹拉正在跃过围栏';
-      if (/returning|putting-back/.test(phase)) return '豹拉正在归还奶桶';
-      return '豹拉正在给小牛送奶';
+        return cooldown > 0
+          ? message('tasks.milkCooldown', { seconds: Math.ceil(cooldown) })
+          : message('tasks.milkReady');
+      if (cancelled) return message('reason.safeMilkReturn');
+      if (phase === 'feeding') return message('reason.drinking');
+      if (phase === 'question') return message('tasks.milkQuestion');
+      if (phase === 'answer') return message('tasks.milkAnswer');
+      if (/windup|jumping|landing/.test(phase)) return message('tasks.milkJump');
+      if (/returning|putting-back/.test(phase)) return message('tasks.milkReturn');
+      return message('tasks.milkDelivery');
     },
     update(dt, car, clockDt = dt) {
       if (!(dt > 0)) return;

@@ -47,18 +47,18 @@ test('menu command rechecks actual controller ownership after opening and cannot
     getCar: () => f.car,
     getTimeOfDay: () => 'day',
   });
-  const target = { type: 'actor', id: 'pvz-gargantuar', name: '大僵尸' };
+  const target = { type: 'actor', id: 'pvz-gargantuar', name: '巨人僵尸' };
   assert.equal(registry.actions(target).find((a) => a.id === 'hold-calf').reason, '');
   assert(f.interactions.reserveFamily());
   const rejected = registry.execute(target, 'hold-calf');
   assert.equal(rejected.ok, false);
-  assert.match(rejected.message, /互动/);
+  assert.equal(rejected.message.code, 'reason.calfBusy');
   assert.equal(f.heist.snapshot().phase, 'waiting');
   f.interactions.familyEvent('cancel');
   assert.equal(registry.execute(target, 'hold-calf').ok, true);
   assert.equal(f.heist.snapshot().manualTask, 'hold');
   assert.equal(registry.execute({ type: 'cart', name: '木车' }, 'capture-calf').ok, false);
-  assert.match(registry.status(target), /走向小牛/);
+  assert.equal(registry.status(target).code, 'tasks.approachCalf');
 });
 
 test('each target exposes only its own actions; animal calls cannot touch or command vehicles', () => {
@@ -149,6 +149,7 @@ test('original giant recapture cancellation still executes its controller action
   });
   const result = registry.execute({ type: 'actor', id: 'pvz-gargantuar' }, 'cancel-rescue');
   assert(result.ok);
-  assert.match(result.message, /取消追回任务/);
+  assert.equal(result.message.code, 'actions.started');
+  assert.equal(result.message.params.action.code, 'actions.cancelRescue');
   assert.equal(cancelled, 1);
 });

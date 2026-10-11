@@ -1,3 +1,5 @@
+import { createI18n } from './i18n/index.js';
+import { message } from './messages.js';
 import { createInspectionPresets } from './qa/inspection-presets.js';
 import { mountainSupportHeight } from './mountain-profile.js';
 
@@ -17,6 +19,7 @@ import { landscapeHeight } from './world-queries.js';
 // Owns inspection state only. Gameplay owns input, camera, audio and the replaceable drive state.
 // getState/getAnimals stay live across reset and asynchronous scene loading.
 export function createFieldQA({
+  i18n = createI18n(),
   params,
   getState,
   getAnimals,
@@ -42,6 +45,26 @@ export function createFieldQA({
   snapshot,
 }) {
   const $ = (id) => document.getElementById(id);
+  const translated = new Map();
+  function localized(element, description) {
+    const value = typeof description === 'string' ? message(description) : description;
+    const text = i18n.format(value);
+    if (element.tagName === 'BUTTON') element.dataset.qaKey = value.code;
+    element.textContent = text;
+    translated.set(element, { value, text });
+  }
+  const unsubscribeLanguage = i18n.subscribe(() => {
+    for (const [element, last] of translated) {
+      if (element.textContent !== last.text) {
+        translated.delete(element);
+        continue;
+      }
+      const text = i18n.format(last.value);
+      element.textContent = text;
+      last.text = text;
+    }
+  });
+
   const inspectionCamera = createInspectionCamera((x, z) =>
     Math.max(drivingHeight(x, z), mountainSupportHeight(x, z)),
   );
@@ -149,30 +172,30 @@ export function createFieldQA({
     const tools = document.createElement('div');
     tools.className = params.has('heistview') ? 'qa-controls qa-heist' : 'qa-controls';
     for (const [label, d] of [
-      ['起点', 0],
-      ['水渠样段', 12],
-      ['样段末端', 24],
-      ['样段返程', 24],
-      ['弯道', 62],
-      ['住宅', 118],
-      ['返程', 190],
+      ['qa.start', 0],
+      ['qa.sample', 12],
+      ['qa.sampleEnd', 24],
+      ['qa.sampleReturn', 24],
+      ['qa.curve', 62],
+      ['qa.house', 118],
+      ['qa.return', 190],
     ]) {
       const b = document.createElement('button');
-      b.textContent = label;
+      localized(b, label);
       b.onclick = () => {
-        if (label === '起点') reset();
-        else api.place(d, label.includes('返程'));
+        if (label === 'qa.start') reset();
+        else api.place(d, label === 'qa.return' || label === 'qa.sampleReturn');
         setMode('playing');
       };
       tools.append(b);
     }
     for (const [label, yaw] of [
-      ['车辆前侧', Math.PI + 0.6],
-      ['车辆侧面', Math.PI / 2],
-      ['车辆后侧', 0.65],
+      ['qa.carFront', Math.PI + 0.6],
+      ['qa.carSide', Math.PI / 2],
+      ['qa.carRear', 0.65],
     ]) {
       const b = document.createElement('button');
-      b.textContent = label;
+      localized(b, label);
       b.onclick = () => {
         views.animal = false;
         views.vehicle = true;
@@ -184,7 +207,7 @@ export function createFieldQA({
       tools.append(b);
     }
     const animalCheck = document.createElement('button');
-    animalCheck.textContent = '金牛动作样板';
+    localized(animalCheck, 'qa.motherMotion');
     animalCheck.onclick = () => {
       views.animalId = 'golden-cow';
       views.tree = null;
@@ -196,7 +219,7 @@ export function createFieldQA({
     };
     tools.append(animalCheck);
     const mountain = document.createElement('button');
-    mountain.textContent = '狼登山观察';
+    localized(mountain, 'qa.wolfMountain');
     mountain.onclick = () => {
       views.animal = views.vehicle = false;
       views.zombie = views.fish = views.cart = null;
@@ -208,14 +231,14 @@ export function createFieldQA({
     };
     tools.append(mountain);
     for (const [id, label] of [
-      ['golden-cow', '金牛'],
-      ['copper-cow', '棕牛'],
-      ['hornless-calf', '小牛'],
-      ['reference-wolf', '狼'],
-      ['baola-leopard', '豹拉'],
+      ['golden-cow', 'qa.motherName'],
+      ['copper-cow', 'qa.bullName'],
+      ['hornless-calf', 'qa.calfName'],
+      ['reference-wolf', 'qa.wolfName'],
+      ['baola-leopard', 'qa.leopardName'],
     ]) {
       const b = document.createElement('button');
-      b.textContent = label + '动作';
+      localized(b, message('qa.animalAction', { animal: message(label) }));
       b.onclick = () => {
         views.animalId = id;
         views.animal = 'tail';
@@ -226,7 +249,7 @@ export function createFieldQA({
       tools.append(b);
     }
     const nearCharge = document.createElement('button');
-    nearCharge.textContent = '公牛近车检查';
+    localized(nearCharge, 'qa.bullNearby');
     nearCharge.onclick = () => {
       const state = getState();
       const a = getAnimals()
@@ -243,7 +266,7 @@ export function createFieldQA({
     };
     tools.append(nearCharge);
     const chargeCheck = document.createElement('button');
-    chargeCheck.textContent = '公牛顶车观察';
+    localized(chargeCheck, 'qa.bullCharge');
     chargeCheck.onclick = () => {
       views.animal = 'charge';
       views.vehicle = false;
@@ -252,14 +275,14 @@ export function createFieldQA({
     };
     tools.append(chargeCheck);
     for (const [id, label] of [
-      ['copper-cow', '公牛'],
-      ['golden-cow', '母牛'],
-      ['hornless-calf', '小牛'],
-      ['reference-wolf', '狼'],
-      ['baola-leopard', '豹'],
+      ['copper-cow', 'qa.bullShortName'],
+      ['golden-cow', 'qa.motherShortName'],
+      ['hornless-calf', 'qa.calfName'],
+      ['reference-wolf', 'qa.wolfName'],
+      ['baola-leopard', 'qa.leopardShortName'],
     ]) {
       const b = document.createElement('button');
-      b.textContent = label + '碰撞检查';
+      localized(b, message('qa.animalCollision', { animal: message(label) }));
       b.onclick = () => {
         const state = getState();
         const a = getAnimals()
@@ -312,11 +335,11 @@ export function createFieldQA({
       tools.append(b);
     }
     for (const [id, label] of [
-      ['reference-wolf', '狼触摸互动检查'],
-      ['baola-leopard', '豹叫声检查'],
+      ['reference-wolf', 'qa.wolfTouch'],
+      ['baola-leopard', 'qa.leopardCall'],
     ]) {
       const b = document.createElement('button');
-      b.textContent = label;
+      localized(b, label);
       b.onclick = () => {
         api.place(5);
         views.animalId = id;
@@ -338,7 +361,7 @@ export function createFieldQA({
       tools.append(b);
     }
     const followCheck = document.createElement('button');
-    followCheck.textContent = '公牛回应小牛观察';
+    localized(followCheck, 'qa.bullResponse');
     followCheck.onclick = () => {
       views.animal = 'follow';
       views.vehicle = false;
@@ -347,7 +370,7 @@ export function createFieldQA({
     };
     tools.append(followCheck);
     const escapeCheck = document.createElement('button');
-    escapeCheck.textContent = '撞牛倒车脱困检查';
+    localized(escapeCheck, 'qa.reverseEscape');
     escapeCheck.onclick = () => {
       const state = getState();
       if (getAnimals().charge.busy()) return;
@@ -394,11 +417,11 @@ export function createFieldQA({
     };
     tools.append(escapeCheck);
     for (const [label, action] of [
-      ['当前动物睡姿检查', 'rest'],
-      ['当前动物起身检查', 'wake'],
+      ['qa.sleep', 'rest'],
+      ['qa.wake', 'wake'],
     ]) {
       const b = document.createElement('button');
-      b.textContent = label;
+      localized(b, label);
       b.onclick = () => {
         views.tree = null;
         views.milk = null;
@@ -412,14 +435,14 @@ export function createFieldQA({
       tools.append(b);
     }
     for (const [label, action] of [
-      ['豹爬树观察', 'start'],
-      ['豹下树检查', 'requestDescent'],
-      ['豹树与假山位置', 'overview'],
-      ['豹动作推进0.1秒', 'step'],
-      ['豹动作下一阶段', 'next'],
+      ['qa.treeClimb', 'start'],
+      ['qa.treeDescend', 'requestDescent'],
+      ['qa.treeLayout', 'overview'],
+      ['qa.treeAdvance', 'step'],
+      ['qa.treeNextPhase', 'next'],
     ]) {
       const button = document.createElement('button');
-      button.textContent = label;
+      localized(button, label);
       button.onclick = async () => {
         const advance = ++views.treeAdvance;
         views.tree = action === 'overview' ? 'overview' : 'leopard';
@@ -455,7 +478,7 @@ export function createFieldQA({
       tools.append(button);
     }
     const familyCheck = document.createElement('button');
-    familyCheck.textContent = '母子互动观察';
+    localized(familyCheck, 'qa.family');
     familyCheck.onclick = () => {
       views.animal = 'family';
       views.vehicle = false;
@@ -464,7 +487,7 @@ export function createFieldQA({
     };
     tools.append(familyCheck);
     const grazeCheck = document.createElement('button');
-    grazeCheck.textContent = '当前动物低头检查';
+    localized(grazeCheck, 'qa.graze');
     grazeCheck.onclick = () => {
       views.tree = null;
       views.milk = null;
@@ -475,7 +498,7 @@ export function createFieldQA({
     };
     tools.append(grazeCheck);
     const turnCheck = document.createElement('button');
-    turnCheck.textContent = '当前动物转弯检查';
+    localized(turnCheck, 'qa.turn');
     turnCheck.onclick = () => {
       views.animal = 'tail';
       views.vehicle = false;
@@ -484,7 +507,7 @@ export function createFieldQA({
     };
     tools.append(turnCheck);
     const steerCheck = document.createElement('button');
-    steerCheck.textContent = '车辆转向检查';
+    localized(steerCheck, 'qa.steer');
     steerCheck.onclick = () => {
       const state = getState();
       state.steer = state.steer > 0.9 ? -1 : 1;
@@ -494,11 +517,11 @@ export function createFieldQA({
     };
     tools.append(steerCheck);
     for (const [label, side] of [
-      ['左漂移检查', 1],
-      ['右漂移检查', -1],
+      ['qa.driftLeft', 1],
+      ['qa.driftRight', -1],
     ]) {
       const check = document.createElement('button');
-      check.textContent = label;
+      localized(check, label);
       check.onclick = () => {
         reset();
         setMode('playing');
@@ -511,7 +534,7 @@ export function createFieldQA({
       tools.append(check);
     }
     const flipCheck = document.createElement('button');
-    flipCheck.textContent = '车辆翻车检查';
+    localized(flipCheck, 'qa.flip');
     flipCheck.onclick = () => {
       const state = getState();
       state.speed = 0;
@@ -520,11 +543,11 @@ export function createFieldQA({
     };
     tools.append(flipCheck);
     for (const [label, near] of [
-      ['房屋音乐远处', false],
-      ['房屋音乐门前', true],
+      ['qa.houseFar', false],
+      ['qa.houseNear', true],
     ]) {
       const b = document.createElement('button');
-      b.textContent = label;
+      localized(b, label);
       b.onclick = () => {
         const state = getState();
         clearInput();
@@ -548,7 +571,7 @@ export function createFieldQA({
       tools.append(b);
     }
     const houseTurn = document.createElement('button');
-    houseTurn.textContent = '房屋音乐转身';
+    localized(houseTurn, 'qa.houseTurn');
     houseTurn.onclick = () => {
       orbit.yaw += Math.PI;
       refreshCamera();
@@ -558,13 +581,13 @@ export function createFieldQA({
     views.report.className = 'qa-report';
     views.report.id = 'qa-report';
     const perf = document.createElement('button');
-    perf.textContent = '性能快照';
+    localized(perf, 'qa.performance');
     perf.onclick = () => {
       views.report.textContent = JSON.stringify(snapshot(), null, 1);
     };
     tools.append(perf);
     const fish = document.createElement('button');
-    fish.textContent = '金鱼游动观察';
+    localized(fish, 'qa.fish');
     fish.onclick = () => {
       views.animal = views.vehicle = false;
       views.zombie = null;
@@ -574,7 +597,7 @@ export function createFieldQA({
     };
     tools.append(fish);
     const zombies = document.createElement('button');
-    zombies.textContent = '僵尸走路观察';
+    localized(zombies, 'qa.zombies');
     zombies.onclick = () => {
       views.zombie =
         views.zombie === 'overview'
@@ -596,7 +619,7 @@ export function createFieldQA({
     };
     tools.append(zombies);
     const plough = document.createElement('button');
-    plough.textContent = '僵尸牵牛犁田观察';
+    localized(plough, 'qa.plough');
     plough.onclick = () => {
       const next = views.plough === 'close' ? 'overview' : 'close';
       resetView();
@@ -606,11 +629,11 @@ export function createFieldQA({
     };
     tools.append(plough);
     for (const [label, view] of [
-      ['扶犁工田边观察', 'worker'],
-      ['长田全景', 'field'],
+      ['qa.worker', 'worker'],
+      ['qa.longField', 'field'],
     ]) {
       const button = document.createElement('button');
-      button.textContent = label;
+      localized(button, label);
       button.onclick = () => {
         resetView();
         views.plough = view;
@@ -619,10 +642,10 @@ export function createFieldQA({
       tools.append(button);
     }
     for (const [label, action] of [
-      ['开始耕田检查', () => getPaddyPloughing()?.start()],
-      ['结束耕田检查', () => getPaddyPloughing()?.stop()],
+      ['qa.startPlough', () => getPaddyPloughing()?.start()],
+      ['qa.endPlough', () => getPaddyPloughing()?.stop()],
       [
-        '耕田流程推进10秒',
+        'qa.advancePlough',
         async () => {
           for (let i = 0; i < 100; i++) {
             await advanceCalfHeist(0.1);
@@ -632,7 +655,7 @@ export function createFieldQA({
       ],
     ]) {
       const button = document.createElement('button');
-      button.textContent = label;
+      localized(button, label);
       button.onclick = async () => {
         if (button.disabled) return;
         button.disabled = true;
@@ -654,7 +677,7 @@ export function createFieldQA({
     ploughAudit.id = 'paddy-plough-audit';
     tools.append(ploughAudit);
     const cart = document.createElement('button');
-    cart.textContent = '僵尸运牛木车观察';
+    localized(cart, 'qa.cart');
     cart.onclick = () => {
       views.cart = views.cart === 'rear' ? 'front' : 'rear';
       views.animal = views.vehicle = false;
@@ -664,7 +687,7 @@ export function createFieldQA({
     };
     tools.append(cart);
     const gate = document.createElement('button');
-    gate.textContent = '木车后栏板开合';
+    localized(gate, 'qa.tailgate');
     gate.onclick = () => {
       const controller = getWoodenCart();
       if (!controller) return;
@@ -672,8 +695,8 @@ export function createFieldQA({
       const open = !controller.snapshot().gateOpen;
       if (controller.setGateOpen(open)) {
         if (!open) controller.setCruising?.(true);
-        views.report.textContent = open ? '后栏板打开，木车保持停车。' : '后栏板关闭后继续行驶。';
-      } else views.report.textContent = '木车正在减速，请停车后再点击开合。';
+        localized(views.report, open ? 'qa.tailgateOpen' : 'qa.tailgateClosed');
+      } else localized(views.report, 'qa.cartSlowing');
       views.cart = 'rear';
       views.animal = views.vehicle = false;
       views.zombie = views.fish = null;
@@ -716,7 +739,7 @@ export function createFieldQA({
         !['waiting', 'complete'].includes(getCalfHeist()?.snapshot().phase) ||
         !field.interactions.reserveTransport(a)
       ) {
-        views.report.textContent = '请刷新场景，在小牛空闲时布置追逐检查。';
+        localized(views.report, 'qa.refreshCalf');
         return;
       }
       const place = (animal, x, zPos, heading = 0) => {
@@ -802,7 +825,7 @@ export function createFieldQA({
           ({ a, x, z }) => !animalPointAllowed(x, z, a, obstacles, residents, getState(), cows),
         )
       ) {
-        views.report.textContent = '检查位置被车辆或场景占用，请移开后重试。';
+        localized(views.report, 'qa.clearPosition');
         return;
       }
       for (const { a, x, z } of placements) {
@@ -812,15 +835,13 @@ export function createFieldQA({
         Object.assign(a.collider, { x, z });
         a.rig = createAnimalAnimation(a.source, a.group, ANIMAL_PROFILES[a.id]);
       }
-      views.report.textContent = lone
-        ? '小牛离开两头成年牛，连续4秒后触发；检查期间三牛暂留原地。'
-        : '小牛回到牛群，抱起前应取消抓捕。';
+      localized(views.report, lone ? 'qa.calfIsolated' : 'qa.calfReunited');
     }
     for (const [label, action] of [
-      ['公牛近路线救援检查', () => inspectRescue(true)],
-      ['公牛远路线追回检查', () => inspectRescue(false)],
+      ['qa.routeNearRescue', () => inspectRescue(true)],
+      ['qa.routeFarRecapture', () => inspectRescue(false)],
       [
-        '公牛顶飞接触检查',
+        'qa.bullImpact',
         () => {
           inspectRescue(true);
           const z = getZombies(),
@@ -834,7 +855,7 @@ export function createFieldQA({
         },
       ],
       [
-        '追逐推进10秒',
+        'qa.chaseAdvance10',
         async () => {
           for (let i = 0; i < 20; i++) {
             advanceCalfHeist(0.5);
@@ -842,35 +863,35 @@ export function createFieldQA({
           }
         },
       ],
-      ['追逐推进0.1秒', () => advanceCalfHeist(0.1)],
-      ['搬牛流程观察', () => {}],
-      ['瞭望塔观察', () => {}],
-      ['瞭望员近景', () => {}],
-      ['小牛落单触发检查', () => reviewCalfIsolation(true)],
-      ['小牛回到牛群检查', () => reviewCalfIsolation(false)],
-      ['牛群落单观察', () => {}],
-      ['只看抱牛 / 重播', () => getCalfHeist()?.previewCarry()],
-      ['抛牛装车 / 重播', () => getCalfHeist()?.previewThrow()],
+      ['qa.chaseAdvanceSmall', () => advanceCalfHeist(0.1)],
+      ['qa.transport', () => {}],
+      ['qa.tower', () => {}],
+      ['qa.lookout', () => {}],
+      ['qa.isolation', () => reviewCalfIsolation(true)],
+      ['qa.reunion', () => reviewCalfIsolation(false)],
+      ['qa.herd', () => {}],
+      ['qa.pickupReplay', () => getCalfHeist()?.previewCarry()],
+      ['qa.throwReplay', () => getCalfHeist()?.previewThrow()],
       [
-        '切换抱法（出发前）',
+        'qa.carryStyle',
         () => {
           const h = getCalfHeist();
           if (!h?.setCarryMode(h.snapshot().carryMode === 'underarm' ? 'two-hand' : 'underarm'))
-            views.report.textContent = '已出发，抱法下次出发前选择。';
+            localized(views.report, 'qa.carryDeparted');
         },
       ],
-      ['搬牛流程推进10秒', () => advanceCalfHeist(10)],
-      ['卸牛抛入栏 / 拍头检查', () => getCalfHeist()?.previewDelivery()],
-      ['卸牛推进到抛牛', () => advanceDeliveryTo('corral-throw-windup')],
-      ['卸牛推进到拍头', () => advanceDeliveryTo('pat-guard')],
-      ['搬牛流程推进1秒', () => advanceCalfHeist(1)],
-      ['抛牛动作逐帧0.1秒', () => advanceCalfHeist(0.1)],
+      ['qa.transportAdvance10', () => advanceCalfHeist(10)],
+      ['qa.unloadReplay', () => getCalfHeist()?.previewDelivery()],
+      ['qa.unloadThrow', () => advanceDeliveryTo('corral-throw-windup')],
+      ['qa.unloadPat', () => advanceDeliveryTo('pat-guard')],
+      ['qa.transportAdvance1', () => advanceCalfHeist(1)],
+      ['qa.throwFrame', () => advanceCalfHeist(0.1)],
     ]) {
       const button = document.createElement('button');
-      button.textContent = label;
+      localized(button, label);
       button.className = 'heist-button';
       button.onclick = () => {
-        const inspection = label.startsWith('卸牛') || label === '抛牛动作逐帧0.1秒';
+        const inspection = label.startsWith('qa.unload') || label === 'qa.throwFrame';
         if (inspection) pauseForThrowInspection();
         else setMode('playing');
         const pending = action();
@@ -881,13 +902,12 @@ export function createFieldQA({
             if (inspection) pauseForThrowInspection();
           });
         }
-        if (label === '抛牛装车 / 重播' || label === '卸牛抛入栏 / 拍头检查')
-          pauseForThrowInspection();
-        if (label === '抛牛动作逐帧0.1秒' && !pending?.finally) pauseForThrowInspection();
+        if (label === 'qa.throwReplay' || label === 'qa.unloadReplay') pauseForThrowInspection();
+        if (label === 'qa.throwFrame' && !pending?.finally) pauseForThrowInspection();
         if (
-          label.includes('路线') ||
-          label.startsWith('追逐推进') ||
-          label === '公牛顶飞接触检查'
+          label.startsWith('qa.route') ||
+          label.startsWith('qa.chaseAdvance') ||
+          label === 'qa.bullImpact'
         ) {
           views.heist = false;
           views.animal = views.vehicle = false;
@@ -899,15 +919,15 @@ export function createFieldQA({
         }
         tools.className = 'qa-controls qa-heist';
         views.heist =
-          label === '瞭望塔观察'
+          label === 'qa.tower'
             ? 'tower'
-            : label === '瞭望员近景'
+            : label === 'qa.lookout'
               ? 'lookout'
-              : label.startsWith('搬牛流程推进') || label === '抛牛动作逐帧0.1秒'
+              : label.startsWith('qa.transportAdvance') || label === 'qa.throwFrame'
                 ? views.heist
-                : label !== '牛群落单观察';
+                : label !== 'qa.herd';
         views.cart = views.corral = views.zombie = null;
-        views.animal = label === '牛群落单观察' ? 'family' : false;
+        views.animal = label === 'qa.herd' ? 'family' : false;
         views.vehicle = false;
         refreshCamera();
       };
@@ -916,7 +936,7 @@ export function createFieldQA({
 
     for (const [label, action] of [
       [
-        '围栏小牛叫声检查',
+        'qa.corralCall',
         () => {
           const field = getAnimals(),
             c = getCorral(),
@@ -927,7 +947,7 @@ export function createFieldQA({
             getCalfHeist()?.snapshot().phase !== 'waiting' ||
             !field.interactions.reserveTransport(a)
           ) {
-            views.report.textContent = '请在小牛空闲、抓捕尚未出发时检查。';
+            localized(views.report, 'qa.calfIdle');
             return;
           }
           restoreCalf(a);
@@ -941,20 +961,20 @@ export function createFieldQA({
           refreshCar();
           tools.className = 'qa-controls';
           views.corral = 'close';
-          views.report.textContent = '同一小牛直接交给围栏；每30秒独立抽50%，靠近车辆可听到。';
+          localized(views.report, 'qa.calfDelivered');
         },
       ],
-      ['送奶准备（小牛入栏）', () => setupMilk()],
+      ['qa.milkSetup', () => setupMilk()],
       [
-        '豹拉开始送奶',
+        'qa.milkStart',
         () => {
           views.milk = 'follow';
           getLeopardMilk()?.start();
         },
       ],
-      ['送奶推进0.1秒', () => advanceCalfHeist(0.1)],
+      ['qa.milkAdvanceSmall', () => advanceCalfHeist(0.1)],
       [
-        '送奶下一阶段',
+        'qa.milkNextPhase',
         async () => {
           const phase = getLeopardMilk()?.snapshot().phase;
           const generation = views.treeAdvance;
@@ -970,9 +990,9 @@ export function createFieldQA({
           }
         },
       ],
-      ['送奶推进1秒', () => advanceCalfHeist(1)],
+      ['qa.milkAdvance1', () => advanceCalfHeist(1)],
       [
-        '送奶推进10秒',
+        'qa.milkAdvance10',
         async () => {
           const generation = views.treeAdvance;
           for (let i = 0; i < 100 && generation === views.treeAdvance; i++) {
@@ -981,41 +1001,39 @@ export function createFieldQA({
           }
         },
       ],
-      ['围栏叫声推进30秒', () => advanceCalfHeist(30)],
+      ['qa.corralAdvance', () => advanceCalfHeist(30)],
       [
-        '围栏与牵牛观察',
+        'qa.corralView',
         () => {
           views.corral = views.corral === 'close' ? 'overview' : 'close';
         },
       ],
       [
-        '围栏门开合',
+        'qa.corralGate',
         () => {
           const c = getCorral();
           if (c && !c.setManualGateOpen(!c.snapshot().gateRequested))
-            views.report.textContent = c.snapshot().controlled
-              ? '正在送小牛入栏，请稍候。'
-              : '门边有东西挡住了，请移开后再试。';
+            localized(views.report, c.snapshot().controlled ? 'qa.calfEntering' : 'qa.gateBlocked');
         },
       ],
-      ['僵尸关围栏门', () => getCorral()?.requestGuardClose()],
+      ['qa.guardClose', () => getCorral()?.requestGuardClose()],
       [
-        '逃跑动物观察',
+        'qa.escaping',
         () => {
           views.corral = 'escape';
         },
       ],
     ]) {
       const b = document.createElement('button');
-      b.textContent = label;
-      if (label === '围栏小牛叫声检查') b.className = 'heist-button';
+      localized(b, label);
+      if (label === 'qa.corralCall') b.className = 'heist-button';
       b.onclick = async () => {
         if (b.disabled) return;
         views.animal = views.vehicle = false;
         views.heist = false;
         views.cart = views.zombie = views.fish = null;
         views.corral ||= 'close';
-        if (label.startsWith('送奶') || label === '豹拉开始送奶') {
+        if (label.startsWith('qa.milk') || label === 'qa.milkStart') {
           views.milk = 'follow';
           setMode('paused');
           document.getElementById('pause-panel')?.classList.add('hidden');
@@ -1031,7 +1049,7 @@ export function createFieldQA({
       tools.append(b);
     }
     const drive = document.createElement('button');
-    drive.textContent = '往返驾驶检查';
+    localized(drive, 'qa.driveCheck');
     drive.onclick = () => {
       api.place(5);
       setMode('playing');
@@ -1041,11 +1059,11 @@ export function createFieldQA({
         maxDeviation: 0,
         started: performance.now(),
       };
-      views.report.textContent = '正在使用原驾驶物理往返检查…';
+      localized(views.report, 'qa.driveRunning');
     };
     tools.append(drive);
     const sample = document.createElement('button');
-    sample.textContent = '水渠往返检查';
+    localized(sample, 'qa.canalCheck');
     sample.onclick = () => {
       api.place(3);
       setMode('playing');
@@ -1057,60 +1075,62 @@ export function createFieldQA({
         maxDeviation: 0,
         started: performance.now(),
       };
-      views.report.textContent = '正在检查水渠样段前后衔接…';
+      localized(views.report, 'qa.canalRunning');
     };
     tools.append(sample);
     const hide = document.createElement('button');
-    hide.textContent = '隐藏验收工具';
+    localized(hide, 'qa.hide');
     hide.onclick = () => {
+      unsubscribeLanguage();
+      translated.clear();
       tools.remove();
       views.report.remove();
     };
     tools.append(hide);
     const corralButtons = new Set([
-      '围栏小牛叫声检查',
-      '围栏叫声推进30秒',
-      '围栏与牵牛观察',
-      '围栏门开合',
-      '僵尸关围栏门',
-      '逃跑动物观察',
+      'qa.corralCall',
+      'qa.corralAdvance',
+      'qa.corralView',
+      'qa.corralGate',
+      'qa.guardClose',
+      'qa.escaping',
     ]);
     const milkButtons = new Set([
-      '送奶准备（小牛入栏）',
-      '豹拉开始送奶',
-      '送奶推进0.1秒',
-      '送奶推进1秒',
-      '送奶推进10秒',
-      '送奶下一阶段',
+      'qa.milkSetup',
+      'qa.milkStart',
+      'qa.milkAdvanceSmall',
+      'qa.milkAdvance1',
+      'qa.milkAdvance10',
+      'qa.milkNextPhase',
     ]);
     if (params.has('milkview'))
       for (const button of tools.children)
         if (
-          !milkButtons.has(button.textContent) &&
-          !['围栏门开合', '性能快照', '隐藏验收工具'].includes(button.textContent)
+          !milkButtons.has(button.dataset.qaKey) &&
+          !['qa.corralGate', 'qa.performance', 'qa.hide'].includes(button.dataset.qaKey)
         )
           button.style.display = 'none';
     const treeButtons = new Set([
-      '豹爬树观察',
-      '豹下树检查',
-      '豹树与假山位置',
-      '豹动作推进0.1秒',
-      '豹动作下一阶段',
+      'qa.treeClimb',
+      'qa.treeDescend',
+      'qa.treeLayout',
+      'qa.treeAdvance',
+      'qa.treeNextPhase',
     ]);
     if (params.has('treeview'))
       for (const button of tools.children)
-        if (!treeButtons.has(button.textContent) && button.textContent !== '隐藏验收工具')
+        if (!treeButtons.has(button.dataset.qaKey) && button.dataset.qaKey !== 'qa.hide')
           button.style.display = 'none';
     for (const button of tools.children) {
-      if (['性能快照', '隐藏验收工具'].includes(button.textContent) || !button.onclick) continue;
+      if (['qa.performance', 'qa.hide'].includes(button.dataset.qaKey) || !button.onclick) continue;
       const action = button.onclick;
       button.onclick = (...args) => {
         inspectionCamera.reset();
         views.queryEnabled = false;
-        if (!corralButtons.has(button.textContent)) views.corral = null;
-        if (!treeButtons.has(button.textContent)) {
+        if (!corralButtons.has(button.dataset.qaKey)) views.corral = null;
+        if (!treeButtons.has(button.dataset.qaKey)) {
           views.tree = null;
-          if (!milkButtons.has(button.textContent)) views.milk = null;
+          if (!milkButtons.has(button.dataset.qaKey)) views.milk = null;
           views.treeAdvance++;
         }
         return action(...args);
@@ -1208,6 +1228,7 @@ export function createFieldQA({
     return true;
   }
   const updateInspectionPreset = createInspectionPresets({
+    i18n,
     views,
     params,
     getPaddyPloughing,

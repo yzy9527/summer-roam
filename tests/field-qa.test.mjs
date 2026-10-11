@@ -7,6 +7,7 @@ import { createFieldObserver } from '../src/field-observer.js';
 import { spawnState, roadFrame, drivingHeight } from '../src/drive.js';
 import { ANIMAL_LAYOUT } from '../src/field-animals.js';
 import { VEHICLE_CONFIG } from '../src/vehicle-config.js';
+import { createI18n } from '../src/i18n/index.js';
 
 // Captured before extraction, not generated from the module under test.
 const contract = JSON.parse(
@@ -27,6 +28,10 @@ function fixture(t, query = 'qa=1', woodenCart = null, corral = null, plough = n
   });
   const nodes = new Map();
   class Element {
+    constructor(tag) {
+      this.tagName = tag.toUpperCase();
+      this.dataset = {};
+    }
     children = [];
     style = {};
     textContent = '';
@@ -39,9 +44,9 @@ function fixture(t, query = 'qa=1', woodenCart = null, corral = null, plough = n
       this.removed = true;
     }
   }
-  nodes.set('game', new Element());
+  nodes.set('game', new Element('main'));
   globalThis.document = {
-    createElement: () => new Element(),
+    createElement: (tag) => new Element(tag),
     getElementById: (id) => nodes.get(id),
   };
   globalThis.window = {};
@@ -58,7 +63,9 @@ function fixture(t, query = 'qa=1', woodenCart = null, corral = null, plough = n
   };
   let refreshes = 0,
     unlocks = 0;
+  const i18n = createI18n();
   const qa = createFieldQA({
+    i18n,
     params: new URLSearchParams(query),
     getState: () => state,
     getAnimals: () => animals,
@@ -96,6 +103,7 @@ function fixture(t, query = 'qa=1', woodenCart = null, corral = null, plough = n
     b.onclick();
   };
   return {
+    i18n,
     qa,
     nodes,
     button,
@@ -119,6 +127,30 @@ function fixture(t, query = 'qa=1', woodenCart = null, corral = null, plough = n
     },
   };
 }
+
+test('QA language changes preserve control identity, raw reports and working callbacks', async (t) => {
+  const f = fixture(t);
+  f.qa.mount();
+  const controls = f.nodes.get('game').children[0].children;
+  const identities = controls.map((button) => button.dataset.qaKey);
+  f.button('性能快照');
+  const report = f.nodes.get('game').children[1];
+  const raw = report.textContent;
+  await f.i18n.setLocale('en');
+  assert.deepEqual(
+    controls.map((button) => button.dataset.qaKey),
+    identities,
+  );
+  assert.equal(report.textContent, raw);
+  assert.equal(f.mode, 'intro');
+  f.button('Canal sample');
+  assert.equal(f.state.z, 12);
+  assert.equal(f.mode, 'playing');
+  await f.i18n.setLocale('zh-CN');
+  f.button('起点');
+  assert.equal(f.state.z, spawnState().z);
+  f.button('隐藏验收工具');
+});
 
 test('plough inspection follows the real cow, switches overview and releases on camera reset', (t) => {
   const group = new THREE.Group();

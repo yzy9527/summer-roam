@@ -1,3 +1,4 @@
+import { message } from './messages.js';
 import { transferAnimal } from './gameplay/animal-ownership.js';
 import { snapshotData } from './app/snapshot-data.js';
 import * as THREE from 'three';
@@ -414,7 +415,7 @@ export function createZombieCorral(
         a.mode !== 'confined' ||
         a.transportOwner !== 'corral'
       )
-        return '需要一头已经关入围栏的小牛';
+        return message('reason.confinedCalf');
       if (
         controlled ||
         recaptureDelivery ||
@@ -423,7 +424,7 @@ export function createZombieCorral(
         gateAmount !== 0 ||
         !gateController.settled
       )
-        return '等待小牛入栏、看守关好门';
+        return message('reason.gateSettling');
       return '';
     },
     reserveMilk(a) {
@@ -457,7 +458,7 @@ export function createZombieCorral(
     },
     ploughAvailability(a) {
       if (!a || !animals.includes(a) || a.id !== 'hornless-calf' || a.mode !== 'confined')
-        return '先将小牛抓回牛栏';
+        return message('reason.captureFirst');
       if (
         controlled ||
         recaptureDelivery ||
@@ -466,7 +467,7 @@ export function createZombieCorral(
         gateAmount !== 0 ||
         !gateController.settled
       )
-        return '等待小牛入栏、看守关好门';
+        return message('reason.gateSettling');
       return '';
     },
     reservePlough(a) {

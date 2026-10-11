@@ -1,3 +1,4 @@
+import { message } from './messages.js';
 import { createHeistCarryPose } from './gameplay/heist/carry-pose.js';
 import { createCrewTransitions } from './gameplay/heist/crew-transitions.js';
 import { updateDriverParking as tickDriverParking } from './gameplay/heist/driver-parking.js';
@@ -764,11 +765,12 @@ export function createZombieCalfHeist(
     manualCancel = false,
     manualAge = 0;
   function manualAvailability(target = fieldAnimals.animal('hornless-calf')) {
-    if (!target || target !== fieldAnimals.animal('hornless-calf')) return '只能操作当前小牛';
+    if (!target || target !== fieldAnimals.animal('hornless-calf'))
+      return message('reason.currentCalf');
     if (!['waiting', 'complete'].includes(phase) || !crewFree() || giant.seated)
-      return '大僵尸正在执行其他任务';
-    if (cooldown > 0) return '抓牛任务冷却中';
-    if (!available()) return '小牛正在休息或参与其他互动';
+      return message('reason.giantBusy');
+    if (cooldown > 0) return message('reason.heistCooldown');
+    if (!available()) return message('reason.calfBusy');
     return lookout?.ringAvailability() ?? '';
   }
   function beginManualLower() {
@@ -859,8 +861,9 @@ export function createZombieCalfHeist(
     previewDelivery,
     manualAvailability,
     alarmAvailability() {
-      if (!lookout) return '瞭望员尚未就绪';
-      if (!['waiting', 'complete'].includes(phase) || !crewFree()) return '抓牛任务进行中';
+      if (!lookout) return message('reason.lookoutNotReady');
+      if (!['waiting', 'complete'].includes(phase) || !crewFree())
+        return message('reason.heistActive');
       return manualAvailability();
     },
     alertManual() {

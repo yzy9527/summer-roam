@@ -1,3 +1,4 @@
+import { message } from './messages.js';
 import * as THREE from 'three';
 import { drivingHeight } from './world-queries.js';
 
@@ -268,7 +269,11 @@ export function createZombieLookout(scene, colliders, zombies) {
       sound = listener;
     },
     ringAvailability() {
-      return ringMode ? (ringMode === 'notice' ? '正在摇铃通知' : '正在摇铃') : '';
+      return ringMode
+        ? ringMode === 'notice'
+          ? message('reason.ringingNotice')
+          : message('reason.ringing')
+        : '';
     },
     ring(mode = 'manual') {
       if (ringMode || !['manual', 'notice'].includes(mode)) return false;

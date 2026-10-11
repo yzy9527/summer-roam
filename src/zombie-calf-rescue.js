@@ -1,3 +1,4 @@
+import { message } from './messages.js';
 import { createBullDefense } from './gameplay/rescue/bull-defense.js';
 import { createRescueNotifications } from './gameplay/rescue/notifications.js';
 import { rescueVisible } from './gameplay/rescue/visibility.js';
@@ -378,8 +379,8 @@ export function createZombieCalfRescue(
     },
     manualAvailability(target) {
       if (phase !== 'idle' || defense.phase !== 'idle' || !freeCrew())
-        return '大僵尸正在执行其他任务';
-      if (cooldown > 0) return '追回任务冷却中';
+        return message('reason.giantBusy');
+      if (cooldown > 0) return message('reason.rescueCooldown');
       if (
         !target ||
         !corral.animals.includes(target) ||
@@ -387,7 +388,7 @@ export function createZombieCalfRescue(
         target.mode !== 'escaping' ||
         !target.outside
       )
-        return '需要一头已逃出围栏的小牛';
+        return message('reason.escapedCalf');
       return '';
     },
     startManual(target) {
