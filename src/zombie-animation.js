@@ -421,6 +421,138 @@ export function createZombieAnimation(
         ),
       );
   return {
+    settleComedy(dt, groundHeight = null) {
+      const feet = legs.map((leg) => leg.foot.bone.getWorldPosition(new THREE.Vector3()));
+      poseBody();
+      for (const [i, leg] of legs.entries()) {
+        leg.pending = false;
+        if (leg.swinging) {
+          const current = feet[i];
+          // A moving stride aims ahead of the future hip position. Once stopped,
+          // finish at a reachable standing footprint instead of chasing that target.
+          const target = group.localToWorld(leg.ankle.clone());
+          target.y = groundHeight
+            ? groundHeight(target.x, target.z) + leg.ankle.y * scale
+            : leg.planted.y;
+          leg.target.copy(target);
+          current.lerp(target, Math.min(1, dt * 12));
+          if (current.distanceTo(target) < 0.002) {
+            current.copy(target);
+            leg.planted.copy(target);
+            leg.swinging = false;
+          }
+          solveLeg(leg, current);
+        } else solveLeg(leg, leg.planted);
+      }
+      synchronize();
+      return !legs.some((leg) => leg.swinging);
+    },
+    comedy(pose, time, moving = false) {
+      const walkingFeet = moving
+        ? legs.map((leg) => leg.foot.bone.getWorldPosition(new THREE.Vector3()))
+        : null;
+      if (!moving) poseBody();
+      const base = new Map([...entries].map(([name, e]) => [name, e.bone.quaternion.clone()]));
+      const hips = entries.get('Hips');
+      const baseHips = hips.bone.position.clone();
+      const shift = new THREE.Vector3(...pose.hips).multiplyScalar(scale * pose.amount);
+      shift.applyQuaternion(group.getWorldQuaternion(new THREE.Quaternion()));
+      const position = hips.bone.getWorldPosition(new THREE.Vector3()).add(shift);
+      hips.bone.position.copy(hips.bone.parent.worldToLocal(position));
+      worldOrientation(entries.get('Spine'), pose.spine);
+      worldOrientation(entries.get('Head'), pose.head);
+      entries.get('Jaw').bone.quaternion.copy(entries.get('Jaw').rest);
+      entries.get('Jaw').bone.rotateZ(pose.jaw);
+      group.updateMatrixWorld(true);
+      for (const side of ['Left', 'Right']) {
+        const offset = new THREE.Vector3(...pose[side.toLowerCase()]).multiplyScalar(scale);
+        offset.applyQuaternion(group.getWorldQuaternion(new THREE.Quaternion()));
+        const shoulder = entries.get(side + 'Arm').bone.getWorldPosition(new THREE.Vector3());
+        this.workGrip(side, shoulder.clone().add(offset), 1, 0.25);
+        if (pose.armExtension) {
+          const arm = entries.get(side + 'Arm'),
+            lower = entries.get(side + 'ForeArm'),
+            hand = entries.get(side + 'Hand');
+          const [upperLength, lowerLength] = armLengths[side];
+          const direction = offset.clone().normalize();
+          const distance = (upperLength + lowerLength) * pose.armExtension[side === 'Left' ? 0 : 1];
+          const pole = new THREE.Vector3(side === 'Left' ? 0.3 : -0.3, -1, 0.1).applyQuaternion(
+            group.getWorldQuaternion(new THREE.Quaternion()),
+          );
+          pole.addScaledVector(direction, -pole.dot(direction)).normalize();
+          const along = (upperLength ** 2 - lowerLength ** 2 + distance ** 2) / (2 * distance);
+          aim(
+            arm,
+            lower.bone,
+            shoulder
+              .clone()
+              .addScaledVector(direction, along)
+              .addScaledVector(pole, Math.sqrt(Math.max(0, upperLength ** 2 - along ** 2))),
+          );
+          aim(lower, hand.bone, shoulder.clone().addScaledVector(direction, distance));
+          // Keep the wrist in its natural local alignment as the whole arm swings.
+          hand.bone.quaternion.copy(hand.rest);
+        }
+        for (const [name, entry] of entries) {
+          if (
+            !name.startsWith(side + 'Hand') ||
+            !/(Middle|Ring|Pinky|Index|Thumb)[0-3]$/.test(name)
+          )
+            continue;
+          entry.bone.quaternion.copy(entry.rest);
+          entry.bone.rotateY((side === 'Left' ? -1 : 1) * pose.curl);
+        }
+      }
+      for (const [name, entry] of entries)
+        entry.bone.quaternion.copy(
+          base.get(name).clone().slerp(entry.bone.quaternion, pose.amount),
+        );
+      // Hip displacement already includes the envelope.
+      if (!pose.amount) hips.bone.position.copy(baseHips);
+      group.updateMatrixWorld(true);
+      for (const [i, leg] of legs.entries()) {
+        if (walkingFeet) {
+          solveLeg(leg, walkingFeet[i]);
+          continue;
+        }
+        const foot = leg.planted.clone();
+        // Alternating small lift-and-replace steps; at least one shoe supports the body.
+        const beat = Math.sin(time * Math.PI * 3 + i * Math.PI);
+        foot.y += Math.max(0, beat) ** 2 * 0.045 * pose.steps * pose.amount;
+        if (pose.feet)
+          foot.add(
+            new THREE.Vector3(...pose.feet[i])
+              .multiplyScalar(scale * pose.amount)
+              .applyQuaternion(group.getWorldQuaternion(new THREE.Quaternion())),
+          );
+        solveLeg(leg, foot);
+      }
+      synchronize();
+    },
+    finishComedy(groundHeight = null) {
+      const feet = legs.map((leg) => leg.foot.bone.getWorldPosition(new THREE.Vector3()));
+      runAmount = 0;
+      stride = walkStride;
+      duty = 0.64;
+      poseBody();
+      for (const [i, leg] of legs.entries()) {
+        if (groundHeight) {
+          leg.planted.copy(feet[i]);
+          leg.planted.y = groundHeight(leg.planted.x, leg.planted.z) + leg.ankle.y * scale;
+          leg.heading = group.rotation.y;
+        }
+        leg.swinging = leg.pending = false;
+        solveLeg(leg, leg.planted);
+      }
+      synchronize();
+    },
+    socialLook(dt, yaw = 0, pitch = 0) {
+      if (!(dt > 0)) return;
+      poseBody();
+      worldOrientation(entries.get('Head'), [pitch, yaw, 0]);
+      for (const leg of legs) solveLeg(leg, leg.planted);
+      synchronize();
+    },
     workGrip(side, target, dt, pitch = 0) {
       if (!(dt > 0) || giant) return;
       const arm = entries.get(side + 'Arm'),

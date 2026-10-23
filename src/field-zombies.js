@@ -9,8 +9,16 @@ import { vehicleObstacleGap } from './vehicle-collision.js';
 import { ZOMBIE_LAYOUT, zombiePatrolPoint } from './zombie-layout.js';
 import { separatesCircle } from './task-clearance.js';
 import { createZombieAnimation } from './zombie-animation.js';
+import { COMEDY_ACTIONS, createComedy } from './gameplay/zombies/comedy.js';
+import { message } from './messages.js';
+import { createZombieTaunt } from './gameplay/zombies/taunt.js';
 
-export function createZombieController(sources, colliders = [], groundHeight = drivingHeight) {
+export function createZombieController(
+  sources,
+  colliders = [],
+  groundHeight = drivingHeight,
+  { comedy = false, random = Math.random } = {},
+) {
   const root = new THREE.Group();
   root.name = 'PvZ zombies on the starting left lawn';
   const actors = [];
@@ -78,6 +86,76 @@ export function createZombieController(sources, colliders = [], groundHeight = d
   }
   for (const layout of ZOMBIE_LAYOUT) addActor(layout);
   colliders.push(...actors.map((actor) => actor.collider));
+  let comedyCar = null;
+  let comedyMoved = false,
+    comedyWalking = false;
+  const browncoat = actors.find((a) => a.layout.id === 'pvz-browncoat');
+  const performance =
+    comedy && browncoat
+      ? createComedy({
+          random,
+          clear: () =>
+            !browncoat.scripted &&
+            !browncoat.seated &&
+            safe(
+              { ...browncoat, collider: { ...browncoat.collider, radius: 1.15 } },
+              browncoat.object.position,
+              comedyCar,
+              (c) => c === browncoat.collider,
+            ),
+          settle: (dt) => browncoat.rig.settleComedy(dt, groundHeight),
+          move: (p, dt) => {
+            if (!p.speed) {
+              if (comedyWalking) comedyWalking = !browncoat.rig.settleComedy(dt, groundHeight);
+              return true;
+            }
+            const from = browncoat.object.position;
+            const heading = browncoat.object.rotation.y;
+            const distance = p.speed * dt;
+            const next = {
+              x: from.x + Math.sin(heading) * distance,
+              z: from.z + Math.cos(heading) * distance,
+            };
+            const steps = Math.max(1, Math.ceil(distance / 0.05));
+            for (let i = 1; i <= steps; i++) {
+              const t = i / steps;
+              if (
+                !safe(
+                  { ...browncoat, collider: { ...browncoat.collider, radius: 1.15 } },
+                  { x: from.x + (next.x - from.x) * t, z: from.z + (next.z - from.z) * t },
+                  comedyCar,
+                  (c) => c === browncoat.collider,
+                )
+              )
+                return false;
+            }
+            from.set(next.x, groundHeight(next.x, next.z), next.z);
+            Object.assign(browncoat.collider, next);
+            browncoat.rig.update(dt, distance, groundHeight, heading, p.run);
+            comedyMoved = comedyWalking = true;
+            return true;
+          },
+          pose: (p, time) => browncoat.rig.comedy(p, time, comedyWalking),
+          finish: () => {
+            browncoat.rig.finishComedy(comedyMoved ? groundHeight : null);
+            if (comedyMoved) {
+              browncoat.layout = {
+                ...browncoat.layout,
+                x:
+                  browncoat.object.position.x -
+                  browncoat.layout.patrolX * Math.cos(browncoat.phase),
+                z:
+                  browncoat.object.position.z -
+                  browncoat.layout.patrolZ * Math.sin(browncoat.phase),
+              };
+            }
+            comedyMoved = comedyWalking = false;
+          },
+        })
+      : null;
+  function interruptComedy(actor) {
+    if (actor === browncoat && performance?.active) performance.cancel();
+  }
   let elapsed = 0;
   function safe(
     actor,
@@ -135,9 +213,31 @@ export function createZombieController(sources, colliders = [], groundHeight = d
       !car || vehicleObstacleGap(car.x, car.z, car.heading ?? 0, { ...actor.collider, ...p }) > 0.4
     );
   }
+  let taunt = null;
+  let socialAvailable = () => true;
+  let idleSocialPatrol = () => false;
   // No static substitute is used when an asset or its rig cannot load.
-  return {
+  const api = {
     root,
+    setSocialAvailability(check, patrol = () => false) {
+      socialAvailable = check;
+      idleSocialPatrol = patrol;
+    },
+    tauntAvailability: () => taunt?.availability() ?? message('actions.tauntNotReady'),
+    startTaunt: (car) => taunt?.start(car) ?? false,
+    cancelTaunt: () => taunt?.cancel() ?? false,
+    tauntState: () => taunt?.snapshot() ?? { active: false },
+    comedyAvailability() {
+      if (!performance) return message('actions.comedyNotReady');
+      if (browncoat.scripted || browncoat.seated || performance.active)
+        return message('actions.comedyBusy');
+      return '';
+    },
+    performComedy(id, car) {
+      comedyCar = car;
+      if (this.comedyAvailability() || !COMEDY_ACTIONS.some((a) => a.id === id)) return false;
+      return performance.start(id);
+    },
     actor: (id) => actors.find((a) => a.layout.id === id),
     addPloughman(at) {
       let actor = actors.find((a) => a.layout.id === 'pvz-ploughman');
@@ -262,12 +362,14 @@ export function createZombieController(sources, colliders = [], groundHeight = d
     },
     take(id) {
       const actor = actors.find((a) => a.layout.id === id && !a.seated);
+      interruptComedy(actor);
       if (actor) actor.scripted = true;
       return actor;
     },
     face(id, target, dt, car, { ignore, ground = groundHeight } = {}) {
       const actor = actors.find((a) => a.layout.id === id && !a.seated);
       if (!actor || !(dt > 0)) return false;
+      interruptComedy(actor);
       actor.scripted = true;
       const p = actor.object.position;
       const desired = Math.atan2(target.x - p.x, target.z - p.z);
@@ -333,6 +435,7 @@ export function createZombieController(sources, colliders = [], groundHeight = d
     ) {
       const actor = actors.find((a) => a.layout.id === id && !a.seated);
       if (!actor || !(dt > 0)) return false;
+      interruptComedy(actor);
       actor.scripted = true;
       const p = actor.object.position,
         dx = target.x - p.x,
@@ -389,6 +492,7 @@ export function createZombieController(sources, colliders = [], groundHeight = d
     mountDriver(parent, id = 'pvz-browncoat') {
       const actor = actors.find((a) => a.layout.id === id);
       if (!actor || actor.seated) throw new Error('Browncoat unavailable for wooden cart');
+      interruptComedy(actor);
       actor.seated = true;
       actor.driverRest = [];
       actor.source.traverse((bone) => {
@@ -440,8 +544,10 @@ export function createZombieController(sources, colliders = [], groundHeight = d
       if (!(dt > 0)) return;
       dt = Math.min(dt, 0.1);
       elapsed += dt;
+      comedyCar = car;
       for (const actor of actors) {
         if (actor.seated || actor.scripted) continue;
+        if (actor === browncoat && performance?.update(dt)) continue;
         const { layout, object } = actor;
         if (actor.patrolHome) {
           actor.patrolWait = Math.max(0, (actor.patrolWait ?? 0) - dt);
@@ -541,6 +647,7 @@ export function createZombieController(sources, colliders = [], groundHeight = d
         actor.rig.update(dt, distance, groundHeight);
         actor.rig.flutter(dt);
       }
+      taunt?.update(dt, car);
     },
     snapshot: () => ({
       elapsed,
@@ -553,12 +660,21 @@ export function createZombieController(sources, colliders = [], groundHeight = d
           'YXZ',
         ).y,
         blocked: actor.blocked,
+        ...(actor === browncoat && performance ? { comedy: performance.snapshot() } : {}),
         ...(actor.scripted ? { scripted: true } : {}),
         radius: actor.collider.radius,
         ...(actor.seated ? actor.seatedPose?.snapshot() : actor.rig.snapshot()),
       })),
     }),
   };
+  if (comedy)
+    taunt = createZombieTaunt(
+      api,
+      groundHeight,
+      () => socialAvailable(),
+      () => idleSocialPatrol(),
+    );
+  return api;
 }
 
 export async function addFieldZombies(scene, colliders, warnings) {
@@ -574,7 +690,7 @@ export async function addFieldZombies(scene, colliders, warnings) {
     }),
   );
   try {
-    const controller = createZombieController(sources, colliders);
+    const controller = createZombieController(sources, colliders, drivingHeight, { comedy: true });
     scene.add(controller.root);
     return controller;
   } catch (error) {

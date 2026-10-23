@@ -857,6 +857,17 @@ export async function buildField(
     calfRescue = calfHeist
       ? createZombieCalfRescue(scene, colliders, zombies, animals, corral, calfHeist)
       : null;
+    zombies?.setSocialAvailability(
+      () => {
+        const rescue = calfRescue?.snapshot();
+        return (
+          !!calfHeist?.giantAvailable() &&
+          rescue?.phase === 'idle' &&
+          rescue?.bull?.phase === 'idle'
+        );
+      },
+      () => !!calfRescue?.snapshot().patrolGoal,
+    );
     leopardMilk = createLeopardMilkVisit(scene, colliders, animals, corral);
     const qaParams = new URLSearchParams(globalThis.location?.search ?? '');
     if (

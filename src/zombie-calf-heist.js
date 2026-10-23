@@ -197,7 +197,7 @@ export function createZombieCalfHeist(
   const available = () => fieldAnimals.transportAvailable('hornless-calf');
   // Free patrol may be temporarily owned by the calf rescue controller.
   let rescueCrewAvailable = () => true;
-  const crewFree = () => rescueCrewAvailable();
+  const crewFree = () => !giant.socialOwner && rescueCrewAvailable();
   function notifyLookout() {
     if (!lookout) {
       depart();

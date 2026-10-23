@@ -1,4 +1,26 @@
 export default {
+  'actions.tauntRunning': '挑衅闹剧进行中',
+  'actions.tauntBlocked': '这里施展不开，换个空旷的位置再试试',
+
+  'actions.taunt': '挑衅',
+  'actions.cancelTaunt': '停止挑衅',
+  'actions.tauntNotReady': '巨人僵尸尚未就绪',
+  'actions.tauntBusy': '僵尸正在忙，稍后再来挑衅',
+  'actions.tauntCooldown': '刚被教训过，先缓一缓',
+  'actions.tauntTooFar': '离巨人僵尸太远了',
+
+  'actions.comedyDisco': '疯狂蹦迪',
+  'actions.comedyPursuit': '丧尸抓捕',
+
+  'actions.browncoat': '普通僵尸',
+  'actions.comedyreboot': '死机重启',
+  'actions.comedyscratch': '挠头想不通',
+  'actions.comedyscare': '装凶失败',
+  'actions.comedydance': '僵尸尬舞',
+  'actions.comedytrip': '绊脚装没事',
+  'actions.comedyBusy': '正在表演或处理其他事情',
+  'actions.comedyNotReady': '普通僵尸尚未就绪',
+
   'actions.mother': '母牛',
   'actions.bull': '公牛',
   'actions.calf': '小牛',

@@ -618,6 +618,76 @@ export function createFieldQA({
       refreshCamera();
     };
     tools.append(zombies);
+    if (params.has('socialcheck')) {
+      for (const [label, action] of [
+        ['qa.discoPreview', () => getZombies()?.performComedy('disco', getState())],
+        [
+          'qa.tauntPreview',
+          () => {
+            const z = getZombies(),
+              small = z?.actor('pvz-browncoat'),
+              giant = z?.actor('pvz-gargantuar');
+            const rescue = getCalfRescue()?.snapshot();
+            if (
+              !small ||
+              !giant ||
+              small.scripted ||
+              giant.seated ||
+              !getCalfHeist()?.giantAvailable() ||
+              rescue?.phase !== 'idle' ||
+              rescue?.bull?.phase !== 'idle' ||
+              z.tauntState().active
+            )
+              return false;
+            // Inspection setup only. The subsequent approach, contact and exit all
+            // run through the ordinary gameplay tick, including real collisions.
+            for (const [actor, x, atZ] of [
+              [small, 151, 5],
+              [giant, 148, 10],
+            ]) {
+              z.take(actor.layout.id);
+              actor.object.position.set(x, drivingHeight(x, atZ), atZ);
+              actor.object.rotation.set(0, actor === giant ? 0 : Math.PI, 0, 'YXZ');
+              Object.assign(actor.collider, { x, z: atZ });
+              z.rebind(actor.layout.id);
+              z.release(actor.layout.id);
+            }
+            return z.startTaunt(getState());
+          },
+        ],
+        ['qa.socialSecond', () => advanceCalfHeist(1)],
+        ['qa.socialFrame', () => advanceCalfHeist(0.1)],
+      ]) {
+        const b = document.createElement('button');
+        localized(b, label);
+        b.onclick = () => {
+          setMode('paused');
+          document.getElementById('pause-panel')?.classList.add('hidden');
+          clearInput();
+          Object.assign(views, {
+            zombie: 'pvz-browncoat',
+            animal: false,
+            vehicle: false,
+            heist: false,
+            corral: null,
+            milk: null,
+            fish: null,
+            cart: null,
+          });
+          const ok = action();
+          if (getZombies()?.tauntState().active) views.zombie = 'pvz-gargantuar';
+          views.report.textContent = JSON.stringify({
+            ok,
+            taunt: getZombies()?.tauntState(),
+            comedy: getZombies()
+              ?.snapshot()
+              .zombies.find((z) => z.id === 'pvz-browncoat')?.comedy,
+          });
+          refreshCamera();
+        };
+        tools.append(b);
+      }
+    }
     const plough = document.createElement('button');
     localized(plough, 'qa.plough');
     plough.onclick = () => {

@@ -47,5 +47,9 @@ export const RELEASE_BUDGET = Object.freeze({
   // QA measure 1142.3 KiB (+38.5 KiB); retain the binary/file caps.
   // Approved quiet HUD, event-driven hints, help/settings tabs and bilingual
   // controls measure 1152.9 KiB (+10.5 KiB); retain binary/file caps.
-  codeBytes: 1153 * 1024,
+  // Approved rescue exit work plus browncoat performances, two-actor taunting,
+  // ownership handoffs and bilingual inspection tools measure 1171.4 KiB.
+  // The workspace without the new browncoat work measured 1159.1 KiB; retain
+  // the existing file and binary caps and round only the measured code budget.
+  codeBytes: 1172 * 1024,
 });

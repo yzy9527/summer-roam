@@ -1,4 +1,5 @@
 import { message } from './messages.js';
+import { COMEDY_ACTIONS } from './gameplay/zombies/comedy.js';
 const ANIMAL_NAMES = {
   'golden-cow': message('actions.mother'),
   'copper-cow': message('actions.bull'),
@@ -35,6 +36,7 @@ export function pickActionTarget(scene, ray, field, car) {
       return { type: 'animal', animal, name: ANIMAL_NAMES[animal.id], point: hit.point.clone() };
     if (n === field?.corral?.model.gate) return { type: 'gate', name: message('actions.gate') };
     for (const [id, name] of [
+      ['pvz-browncoat', message('actions.browncoat')],
       ['pvz-flagbearer', message('actions.flagbearer')],
       ['pvz-ploughman', message('actions.ploughman')],
       ['pvz-gargantuar', message('actions.giant')],
@@ -182,6 +184,22 @@ export function createSceneActions({
         message('actions.closeGate'),
         () => corral.setManualGateOpen(false),
         gate.controlled ? message('reason.delivering') : '',
+      );
+    }
+    if (target?.id === 'pvz-browncoat') {
+      for (const action of COMEDY_ACTIONS)
+        add(
+          'comedy-' + action.id,
+          message(action.label),
+          () => field.zombies.performComedy(action.id, getCar()),
+          field.zombies?.comedyAvailability() ?? message('actions.comedyNotReady'),
+        );
+      const taunting = field.zombies?.tauntState?.().active;
+      add(
+        taunting ? 'cancel-taunt' : 'taunt',
+        message(taunting ? 'actions.cancelTaunt' : 'actions.taunt'),
+        () => (taunting ? field.zombies.cancelTaunt() : field.zombies.startTaunt(getCar())),
+        taunting ? '' : (field.zombies?.tauntAvailability?.() ?? message('actions.tauntNotReady')),
       );
     }
     if (target?.id === 'pvz-ploughman') {
@@ -351,6 +369,13 @@ export function createSceneActions({
   return {
     actions,
     status(target) {
+      if (target?.id === 'pvz-browncoat') {
+        const state = getField()?.zombies?.tauntState?.();
+        if (state?.active) return message('actions.tauntRunning');
+        if (['no-space', 'blocked', 'timeout', 'missed'].includes(state?.outcome))
+          return message('actions.tauntBlocked');
+        return '';
+      }
       if (target?.animal?.id === 'baola-leopard') return getField()?.leopardMilk?.status() ?? '';
       if (target?.id === 'pvz-flagbearer' || target?.id === 'pvz-ploughman')
         return getField()?.paddyPloughing?.status() ?? '';
@@ -394,19 +419,21 @@ export function createSceneActions({
       if (!action) return { ok: false, message: message('actions.unavailable') };
       if (action.reason) return { ok: false, message: action.reason };
       const ok = !!action.run();
-      const started = [
-        'start-plough',
-        'stop-plough',
-        'ring-bell',
-        'calf-alarm',
-        'hold-calf',
-        'capture-calf',
-        'recapture-calf',
-        'put-down',
-        'cancel-heist',
-        'cancel-rescue',
-        'milk',
-      ].includes(id);
+      const started =
+        [
+          'start-plough',
+          'stop-plough',
+          'ring-bell',
+          'calf-alarm',
+          'hold-calf',
+          'capture-calf',
+          'recapture-calf',
+          'put-down',
+          'cancel-heist',
+          'cancel-rescue',
+          'milk',
+          'taunt',
+        ].includes(id) || id.startsWith('comedy-');
       return {
         ok,
         message: ok

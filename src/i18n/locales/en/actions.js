@@ -1,4 +1,26 @@
 export default {
+  'actions.tauntRunning': 'Taunting the giant',
+  'actions.tauntBlocked': 'Not enough room; try again in an open area',
+
+  'actions.taunt': 'Taunt',
+  'actions.cancelTaunt': 'Stop taunting',
+  'actions.tauntNotReady': 'Giant zombie is not ready',
+  'actions.tauntBusy': 'The zombies are busy; try taunting later',
+  'actions.tauntCooldown': 'Still recovering from the last lesson',
+  'actions.tauntTooFar': 'Too far from the giant zombie',
+
+  'actions.comedyDisco': 'Disco frenzy',
+  'actions.comedyPursuit': 'Zombie pursuit',
+
+  'actions.browncoat': 'Browncoat zombie',
+  'actions.comedyreboot': 'Reboot',
+  'actions.comedyscratch': 'Scratch head',
+  'actions.comedyscare': 'Failed scare',
+  'actions.comedydance': 'Awkward dance',
+  'actions.comedytrip': 'Stumble and recover',
+  'actions.comedyBusy': 'Performing or busy with another task',
+  'actions.comedyNotReady': 'Browncoat zombie is not ready',
+
   'actions.mother': 'Mother cow',
   'actions.bull': 'Bull',
   'actions.calf': 'niulai',

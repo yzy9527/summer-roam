@@ -1,4 +1,9 @@
 export default {
+  'qa.discoPreview': '蹦迪动作预览',
+  'qa.tauntPreview': '挑衅流程预览',
+  'qa.socialSecond': '僵尸表演推进1秒',
+  'qa.socialFrame': '僵尸表演逐帧0.1秒',
+
   'qa.start': '起点',
   'qa.sample': '水渠样段',
   'qa.sampleEnd': '样段末端',

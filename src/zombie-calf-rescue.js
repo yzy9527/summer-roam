@@ -101,6 +101,7 @@ export function createZombieCalfRescue(
   });
   const { beginNotice, finishNotice, advanceNotice, alertOthers } = notifications;
   const freeCrew = () =>
+    !giant.socialOwner &&
     (heist?.giantAvailable?.() ??
       heist?.crewAvailable?.() ??
       ['waiting', 'complete'].includes(heist?.snapshot().phase ?? 'complete')) &&

@@ -1,4 +1,9 @@
 export default {
+  'qa.discoPreview': 'Preview disco dance',
+  'qa.tauntPreview': 'Preview taunt sequence',
+  'qa.socialSecond': 'Advance zombie performance 1 s',
+  'qa.socialFrame': 'Step zombie performance 0.1 s',
+
   'qa.start': 'Start',
   'qa.sample': 'Canal sample',
   'qa.sampleEnd': 'Sample end',
