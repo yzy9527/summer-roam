@@ -42,16 +42,24 @@ export function findAnimalPath(start, goal, allowed, options) {
 
 // Yield between clearance samples, expansions and simplification checks so a
 // caller can share a bounded search budget across all actors in a display frame.
-export function* animalPathSearch(start, goal, allowed, { step = 1, padding = 10 } = {}) {
+export function* animalPathSearch(
+  start,
+  goal,
+  allowed,
+  { step = 1, padding = 10, canStep = () => true } = {},
+) {
   function* sample(x, z) {
     yield;
     return allowed(x, z);
   }
   function* segment(a, b, spacing = 0.2) {
     const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / spacing));
-    for (let i = 1; i <= steps; i++)
-      if (!(yield* sample(a.x + ((b.x - a.x) * i) / steps, a.z + ((b.z - a.z) * i) / steps)))
-        return false;
+    let previous = a;
+    for (let i = 1; i <= steps; i++) {
+      const next = { x: a.x + ((b.x - a.x) * i) / steps, z: a.z + ((b.z - a.z) * i) / steps };
+      if (!(yield* sample(next.x, next.z)) || !canStep(previous, next)) return false;
+      previous = next;
+    }
     return true;
   }
   if (!(yield* sample(goal.x, goal.z))) return null;

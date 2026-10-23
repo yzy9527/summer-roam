@@ -78,10 +78,13 @@ export function createAnimalAnimation(root, group, profile = {}) {
     muzzle.traverse((n) => {
       if (n.isMesh) {
         const pos = n.geometry.attributes.position;
+        const toGroup = new THREE.Matrix4()
+          .copy(group.matrixWorld)
+          .invert()
+          .multiply(n.matrixWorld);
+        const vertex = new THREE.Vector3();
         for (let i = 0; i < pos.count; i++)
-          localBox.expandByPoint(
-            group.worldToLocal(n.localToWorld(new THREE.Vector3().fromBufferAttribute(pos, i))),
-          );
+          localBox.expandByPoint(vertex.fromBufferAttribute(pos, i).applyMatrix4(toGroup));
       }
     });
   const contactLocal = localBox.isEmpty()
@@ -97,7 +100,7 @@ export function createAnimalAnimation(root, group, profile = {}) {
     const pos = n.geometry.attributes.position;
     let tip = null;
     for (let i = 0; i < pos.count; i++) {
-      const v = n.localToWorld(new THREE.Vector3().fromBufferAttribute(pos, i));
+      const v = new THREE.Vector3().fromBufferAttribute(pos, i).applyMatrix4(n.matrixWorld);
       if (!tip || v.y > tip.y) tip = v;
     }
     if (tip) hornTips.push(head.worldToLocal(tip));

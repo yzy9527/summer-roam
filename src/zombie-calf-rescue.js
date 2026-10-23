@@ -1,6 +1,7 @@
 import { message } from './messages.js';
 import { createBullDefense } from './gameplay/rescue/bull-defense.js';
 import { createRescueNotifications } from './gameplay/rescue/notifications.js';
+import { createRescueExitNavigation } from './gameplay/rescue/exit-navigation.js';
 import { rescueVisible } from './gameplay/rescue/visibility.js';
 import { snapshotData, recordPhase } from './app/snapshot-data.js';
 import * as THREE from 'three';
@@ -10,6 +11,7 @@ import { drivingHeight } from './world-queries.js';
 import { createCalfTransportPose, restoreCalf } from './calf-transport-pose.js';
 import { createAnimalAnimation } from './animal-animation.js';
 import { ANIMAL_PROFILES } from './animal-profiles.js';
+import { CORRAL } from './corral-model.js';
 
 import { CALF_RESCUE } from './gameplay/rescue/config.js';
 export { CALF_RESCUE } from './gameplay/rescue/config.js';
@@ -31,6 +33,9 @@ export function createZombieCalfRescue(
   const giant = zombies.actor(GIANT),
     bull = fieldAnimals.animal('copper-cow');
   const interactions = fieldAnimals.interactions;
+  const exitNavigation = createRescueExitNavigation(colliders, giant);
+  const exitGoal = { x: 158, z: 16 };
+  let exitStops = [];
   let phase = 'idle',
     time = 0,
     elapsed = 0,
@@ -109,6 +114,7 @@ export function createZombieCalfRescue(
         c === giant.collider || c === owner?.collider || (owner === bull && c === calf?.collider),
     );
   function set(next) {
+    if (next !== 'leaving') exitNavigation.reset();
     phase = next;
     time = 0;
     route = [];
@@ -143,7 +149,14 @@ export function createZombieCalfRescue(
   }
   function giantAllowed(x, z, car, heading = giant.object.rotation.y, held = carrying) {
     if (
-      ['fleeing', 'leaving'].includes(phase) &&
+      phase === 'leaving' &&
+      calf &&
+      gap({ x, z }, calf) <
+        Math.min(gap(position(), calf), giant.collider.radius + calf.radius + 0.12) - 1e-6
+    )
+      return false;
+    if (
+      phase === 'fleeing' &&
       calf &&
       gap(position(), calf) < giant.collider.radius + calf.radius + 0.12 &&
       gap({ x, z }, calf) < gap(position(), calf) - 1e-6
@@ -199,7 +212,20 @@ export function createZombieCalfRescue(
       return false;
     }
     const movedGoal = !routeGoal || gap(goal, routeGoal) > 0.8;
-    if ((movedGoal || !route.length || giant.blocked) && retry === 0) {
+    if (phase === 'leaving' && !route.length && gap(position(), goal) >= 0.05) {
+      exitNavigation.update(
+        position(),
+        position().z < CORRAL.z - CORRAL.halfZ - 1.75 ? [exitGoal] : exitStops,
+        calf,
+        car,
+        dt,
+      );
+      route = exitNavigation.takePath() ?? [];
+    } else if (
+      phase !== 'leaving' &&
+      (movedGoal || !route.length || giant.blocked) &&
+      retry === 0
+    ) {
       routeGoal = { ...goal };
       route =
         findAnimalPath(position(), goal, (x, z) => giantAllowed(x, z, car, desired), {
@@ -242,6 +268,7 @@ export function createZombieCalfRescue(
       )
     ) {
       route = [];
+      if (phase === 'leaving') exitNavigation.reset();
       giant.rig.stopRunning();
       giant.blocked = true;
       return false;
@@ -258,6 +285,10 @@ export function createZombieCalfRescue(
       })
     )
       route.shift();
+    if (phase === 'leaving' && giant.blocked) {
+      route = [];
+      exitNavigation.reset();
+    }
     return gap(position(), goal) < 0.05;
   }
   function abandon(reason) {
@@ -300,6 +331,9 @@ export function createZombieCalfRescue(
       return;
     transfer = { start: calf.group.position.clone(), target, reason };
     set('dropping');
+    // Reverse along the entry lane before turning left outside the posts. This
+    // gives the calf space and avoids an immediate diagonal back across it.
+    exitStops = [{ x: position().x, z: CORRAL.z - CORRAL.halfZ - 1.8 }, exitGoal];
   }
   function respondToAlert() {
     if (!pendingAlert) return;
@@ -645,6 +679,14 @@ export function createZombieCalfRescue(
         pose.update(dt, true, 1 - t, 'underarm');
         giant.rig.hold(pose.supports('underarm'), 0.6 * t, dt, 1, 'underarm');
         syncCalf();
+        if (transfer.reason === 'recaptured')
+          exitNavigation.update(
+            position(),
+            exitStops,
+            { ...calf, x: transfer.target.x, z: transfer.target.z },
+            car,
+            dt,
+          );
         if (t === 1) {
           carrying = false;
           rebuildCalf();
@@ -659,7 +701,7 @@ export function createZombieCalfRescue(
           }
         }
       } else if (phase === 'leaving') {
-        if (moveGiant({ x: 158, z: 16 }, dt, car, CALF_RESCUE.walk)) {
+        if (moveGiant(exitGoal, dt, car, CALF_RESCUE.walk)) {
           corral.prepareGate(false);
           cooldown = CALF_RESCUE.cooldown;
           finish();
@@ -736,6 +778,7 @@ export function createZombieCalfRescue(
         rescues,
         impacts,
         handGap,
+        exitNavigation: exitNavigation.snapshot(),
         route: route.map((p) => ({ ...p })),
         history: [...history],
         giant: position().toArray(),

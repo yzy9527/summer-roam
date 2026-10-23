@@ -783,6 +783,18 @@ export function createFieldQA({
       observer.rig.update(0.01, 0, landscapeHeight);
       z.release(observer.layout.id);
       Object.assign(getState(), { x: -22, z: -6, heading: 0, speed: 0, steer: 0 });
+      // Reuse the existing far-recapture inspection for a short, repeatable
+      // exit regression. All motion after setup uses the normal gameplay tick.
+      if (!near && params.has('recaptureexitcheck')) {
+        place(a, 163.46, 14.08, 0);
+        Object.assign(a, { route: [], planWait: 600, routeGoal: 'exit' });
+        giant.object.position.set(164.54, landscapeHeight(164.54, 14), 14);
+        giant.object.rotation.set(0, 0, 0, 'YXZ');
+        Object.assign(giant.collider, { x: 164.54, z: 14 });
+        z.rebind('pvz-gargantuar');
+        r.startManual(a);
+        Object.assign(getState(), { x: 132, z: 10, heading: 0, speed: 0, steer: 0 });
+      }
       clearInput();
       refreshCar();
       views.corral = 'escape';

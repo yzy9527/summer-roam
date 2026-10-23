@@ -102,6 +102,76 @@ test('far bull permits real hand contact, same-instance capture and a complete r
   assert.equal(f.corral.snapshot().recaptureDelivery, false);
 });
 
+for (const fps of [30, 60, 120]) {
+  test(`${fps}fps: recaptured calf releases the exit lane without a grid deadlock, keeps ownership and closes the gate`, async () => {
+    const f = await rescueFixture(() => 0);
+    const calf = f.escaping(163.46, 14.08, { x: 163.46, z: 19 });
+    const original = calf.group;
+    f.placeGiant(164.54, 14, 0);
+    assert(f.rescue.startManual(calf));
+    // Isolate the approach from the long escape journey, but require actual
+    // palm contact before handing the rest to the normal gameplay tick.
+    for (let i = 0; i < fps * 3 && !f.rescue.snapshot().captures; i++)
+      f.rescue.update(1 / fps, f.car);
+    assert.equal(f.rescue.snapshot().captures, 1);
+    for (let i = 0; i < fps * 40 && f.rescue.snapshot().phase !== 'leaving'; i++) f.tick(1 / fps);
+    assert.equal(f.rescue.snapshot().phase, 'leaving');
+    assert(f.rescue.snapshot().exitNavigation.ready, 'Plan the exit during the lowering animation');
+    assert.equal(calf.transportOwner, 'corral');
+    const paused = f.rescue.snapshot();
+    f.tick(0);
+    assert.deepEqual(f.rescue.snapshot(), paused);
+    let still = 0,
+      longest = 0,
+      blocked = 0,
+      age = 0;
+    while (f.rescue.snapshot().phase === 'leaving' && age < 12) {
+      const previous = f.giant.object.position.clone();
+      f.tick(1 / fps);
+      age += 1 / fps;
+      still = previous.distanceTo(f.giant.object.position) < 1e-6 ? still + 1 / fps : 0;
+      longest = Math.max(longest, still);
+      if (f.giant.blocked) blocked += 1 / fps;
+      assert.equal(calf.group, original);
+      assert.equal(calf.transportOwner, 'corral');
+    }
+    assert.equal(f.rescue.snapshot().phase, 'idle');
+    assert(age < 8, `Exit took ${age}s`);
+    assert(longest < 1.1, `Stationary ${longest}s, including the initial half turn`);
+    assert(blocked < 0.1, `Unobstructed exit was blocked for ${blocked}s`);
+    for (
+      let i = 0;
+      i < fps * 30 && (f.corral.snapshot().gateAmount > 0 || f.corral.snapshot().recaptureDelivery);
+      i++
+    )
+      f.tick(1 / fps);
+    assert.equal(f.corral.snapshot().gateAmount, 0);
+    assert.equal(f.corral.snapshot().recaptureDelivery, false);
+    assert.equal(calf.mode, 'confined');
+  });
+}
+
+test('a player car blocking the exit pauses movement safely, then replans and leaves when it clears', async () => {
+  const f = await rescueFixture(() => 0);
+  const calf = f.escaping(163.46, 14.08, { x: 163.46, z: 19 });
+  f.placeGiant(164.54, 14, 0);
+  f.rescue.startManual(calf);
+  for (let i = 0; i < 180 && !f.rescue.snapshot().captures; i++) f.rescue.update(1 / 60, f.car);
+  for (let i = 0; i < 2400 && f.rescue.snapshot().phase !== 'leaving'; i++) f.tick(1 / 60);
+  assert.equal(f.rescue.snapshot().phase, 'leaving');
+  Object.assign(f.car, { x: 164.54, z: 18.2, heading: 0 });
+  for (let i = 0; i < 300; i++) {
+    f.tick(1 / 60);
+    assert(vehicleObstacleGap(f.car.x, f.car.z, f.car.heading, f.giant.collider) > 0.39);
+  }
+  assert.equal(f.rescue.snapshot().phase, 'leaving');
+  assert.equal(f.corral.snapshot().gateAmount, 1, 'Do not close the gate before the giant exits');
+  Object.assign(f.car, { x: 132, z: 10 });
+  for (let i = 0; i < 900 && f.rescue.snapshot().phase === 'leaving'; i++) f.tick(1 / 60);
+  assert.equal(f.rescue.snapshot().phase, 'idle');
+  assert.equal(calf.transportOwner, 'corral');
+});
+
 test('near bull causes one courage draw, silent defense, and actual horn-mesh contact launches a parabola', async () => {
   const f = await rescueFixture(() => 0.9);
   f.place(f.animal('copper-cow'), -30, 7, Math.PI / 2);

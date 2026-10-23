@@ -3,6 +3,9 @@ import { landscapeHeight } from './world-queries.js';
 
 const up = new THREE.Vector3(0, 1, 0);
 const xAxis = new THREE.Vector3(1, 0, 0);
+// The shipped geometry is immutable. Transport rebuilds the locomotion rig in
+// the same binding pose; retain only its measurement, never mutable pose state.
+const bellyMeasurements = new WeakMap();
 // Fold real articulated limbs with fixed bone lengths. The belly measurement is
 // taken from Body-weighted vertices of the shipped skin, including calf scale.
 export function createAnimalSleepPose({
@@ -20,29 +23,41 @@ export function createAnimalSleepPose({
 }) {
   const pose = profile.sleep;
   if (!pose) return null;
-  let belly = Infinity;
-  root.traverse((mesh) => {
-    if (!mesh.isSkinnedMesh) return;
-    const torsoIndices = new Set(
-      mesh.skeleton.bones.flatMap((bone, index) =>
-        bone === body || ['Pelvis', 'Spine_Lower', 'Spine_Upper', 'Chest'].includes(bone.name)
-          ? [index]
-          : [],
-      ),
-    );
-    const ids = mesh.geometry.attributes.skinIndex,
-      weights = mesh.geometry.attributes.skinWeight;
-    for (let i = 0; i < weights.count; i++) {
-      let weight = 0;
-      for (let k = 0; k < 4; k++)
-        if (torsoIndices.has(ids.getComponent(i, k))) weight += weights.getComponent(i, k);
-      if (weight > 0.8)
-        belly = Math.min(
-          belly,
-          group.worldToLocal(mesh.localToWorld(mesh.getVertexPosition(i, new THREE.Vector3()))).y,
-        );
-    }
-  });
+  const binding = [
+    ...root.matrix.elements,
+    ...[...restQ].flatMap(([bone, q]) => [...bone.position.toArray(), ...q.toArray()]),
+  ];
+  const cached = bellyMeasurements.get(root);
+  const reusable =
+    cached?.group === group &&
+    cached.body === body &&
+    cached.binding.length === binding.length &&
+    cached.binding.every((n, i) => Math.abs(n - binding[i]) < 1e-10);
+  let belly = reusable ? cached.belly : Infinity;
+  if (!reusable)
+    root.traverse((mesh) => {
+      if (!mesh.isSkinnedMesh) return;
+      const torsoIndices = new Set(
+        mesh.skeleton.bones.flatMap((bone, index) =>
+          bone === body || ['Pelvis', 'Spine_Lower', 'Spine_Upper', 'Chest'].includes(bone.name)
+            ? [index]
+            : [],
+        ),
+      );
+      const ids = mesh.geometry.attributes.skinIndex,
+        weights = mesh.geometry.attributes.skinWeight;
+      for (let i = 0; i < weights.count; i++) {
+        let weight = 0;
+        for (let k = 0; k < 4; k++)
+          if (torsoIndices.has(ids.getComponent(i, k))) weight += weights.getComponent(i, k);
+        if (weight > 0.8)
+          belly = Math.min(
+            belly,
+            group.worldToLocal(mesh.localToWorld(mesh.getVertexPosition(i, new THREE.Vector3()))).y,
+          );
+      }
+    });
+  if (!reusable) bellyMeasurements.set(root, { group, body, binding, belly });
   const drop = Math.max(0, belly - pose.belly);
   let amount = 0;
   return {

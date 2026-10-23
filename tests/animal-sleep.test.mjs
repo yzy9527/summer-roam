@@ -17,6 +17,34 @@ function advance(sleep, seconds, mode = 'night') {
   for (let i = 0; i < Math.round(seconds * 10); i++) sleep.update(0.1, mode);
 }
 
+test('same-instance rig rebuild reuses bind-space belly measurement across world transforms, with fresh sleep state', async () => {
+  const root = await loadAnimalGeometry('hornless-calf'),
+    group = new THREE.Group();
+  group.add(root);
+  group.scale.setScalar(0.4875);
+  let vertices = 0;
+  root.traverse((mesh) => {
+    if (!mesh.isSkinnedMesh) return;
+    const original = mesh.getVertexPosition;
+    mesh.getVertexPosition = function (...args) {
+      vertices++;
+      return original.apply(this, args);
+    };
+  });
+  const profile = ANIMAL_PROFILES['hornless-calf'];
+  const first = createAnimalAnimation(root, group, profile);
+  assert(vertices > 1000, 'Initial construction must measure the actual skin');
+  vertices = 0;
+  group.position.set(164.54, 0.12, 22.5);
+  group.rotation.y = Math.PI;
+  const second = createAnimalAnimation(root, group, profile);
+  assert.notEqual(first, second, 'Do not share locomotion or sleep state');
+  assert.equal(vertices, 0, 'Returning the same calf must not rescan its skin');
+  root.scale.multiplyScalar(1.1);
+  createAnimalAnimation(root, group, profile);
+  assert(vertices > 1000, 'A changed local asset transform needs a new measurement');
+});
+
 test('night sleep waits for exclusive activity, vehicle clearance and collision escape', () => {
   const a = stub();
   let busy = true,
